@@ -1,8 +1,7 @@
-package main
-
 // This program demonstrates using the functional package to perform operations
 // on the fibonacci sequence. In particular this program computes the ratio
 // between the size of fibonacci numbers and their position in the sequence.
+package main
 
 import (
   "fmt"
