@@ -219,7 +219,7 @@ func NewMapper(m func(srcPtr interface{}, destPtr interface{}) bool) Mapper {
 // returned pointer is of same type as ptr.
 func NewCreater(ptr interface{}) Creater {
   valueType := reflect.TypeOf(ptr).Elem()
-  return simpleCreater{valueType}
+  return &simpleCreater{valueType}
 }
 
 // NewCreater from func returns a creater that delegates to f.
@@ -501,7 +501,7 @@ type simpleCreater struct {
   reflect.Type
 }
 
-func (c simpleCreater) Create() interface{} {
+func (c *simpleCreater) Create() interface{} {
   return reflect.New(c.Type).Interface()
 }
 
