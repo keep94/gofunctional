@@ -1,9 +1,14 @@
 package functional
 
 import (
+    "errors"
     "fmt"
     "strings"
     "testing"
+)
+
+var (
+  scanError = errors.New("error scanning.")
 )
 
 func TestFilterAndMap(t *testing.T) {
@@ -311,6 +316,42 @@ func TestReadLinesLongLine2(t *testing.T) {
   }
 }
 
+func TestReadRows(t *testing.T) {
+  rows := &fakeRows{ids: []int {3, 4}, names: []string{"foo", "bar"}}
+  s := ReadRows(rows)
+  var results []intAndString
+  AppendValues(s, &results)
+  if output := fmt.Sprintf("%v", results); output != "[{3 foo} {4 bar}]"  {
+    t.Errorf("Expected [{3 foo} {4 bar}] got %v", output)
+  }
+} 
+
+func TestReadRowsEmpty(t *testing.T) {
+  rows := &fakeRows{ids: []int {}, names: []string {}}
+  s := ReadRows(rows)
+  var results []intAndString
+  AppendValues(s, &results)
+  if output := fmt.Sprintf("%v", results); output != "[]"  {
+    t.Errorf("Expected [] got %v", output)
+  }
+} 
+
+func TestReadRowsError(t *testing.T) {
+  rows := &fakeRowsError{}
+  s := ReadRows(rows)
+  var result intAndString
+  func() {
+    defer func() {
+      if x := recover(); x != scanError {
+        t.Errorf("Expected scanError got %v", x)
+      }
+    }()
+    s.Next(&result)
+    t.Error("Expected error reading rows.")
+  }()
+}
+
+
 func TestAny(t *testing.T) {
   a := Any(equal(1), equal(2))
   b := Any()
@@ -412,6 +453,47 @@ type pair struct {
 func (p *pair) Ptrs() []interface{} {
   return []interface{}{&p.x, &p.y}
 }
+
+type intAndString struct {
+  id int
+  name string
+}
+
+func (t *intAndString) Ptrs() []interface{} {
+  return []interface{}{&t.id, &t.name}
+}
+
+type fakeRows struct {
+  ids []int
+  names []string
+  idx int
+}
+
+func (f *fakeRows) Next() bool {
+  if f.idx == len(f.ids) || f.idx == len(f.names) {
+    return false
+  }
+  f.idx++
+  return true
+}
+
+func (f *fakeRows) Scan(args ...interface{}) error {
+  p, q := args[0].(*int), args[1].(*string)
+  *p = f.ids[f.idx - 1]
+  *q = f.names[f.idx - 1]
+  return nil
+}
+
+type fakeRowsError struct {}
+
+func (f *fakeRowsError) Next() bool {
+  return true
+}
+
+func (f *fakeRowsError) Scan(args ...interface{}) error {
+  return scanError
+}
+  
 
 
 func xrange(start, end int) Stream {

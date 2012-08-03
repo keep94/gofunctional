@@ -50,6 +50,15 @@ type Creater interface {
   Create() interface{}
 }
 
+// Rows represents rows in a database table
+type Rows interface {
+  // Next advances to the next row. Next returns false if there is no next row.
+  // Every call to Scan, even the first one, must be preceded by a call to Next.
+  Next() bool
+  // Reads the values out of the current row. args are pointer types.
+  Scan(args ...interface{}) error
+}
+
 // Map applies f to s and returns the new Stream. If s is
 // (x1, x2, x3, ...), Map returns the Stream (f(x1), f(x2), f(x3), ...).
 // c creates the instance that s emits to.
@@ -133,6 +142,11 @@ func DropWhile(f Filterer, s Stream) Stream {
 // string types do not contain the end of line characters.
 func ReadLines(r io.Reader) Stream {
   return lineStream{bufio.NewReader(r)}
+}
+
+// ReadRows returns the rows in a database table as a Stream of Tuple types.
+func ReadRows(r Rows) Stream {
+  return rowStream{r}
 }
 
 // AppendValues evaluates s and places each element in s
@@ -388,6 +402,21 @@ func (s lineStream) readRestOfLine(line []byte) string {
     }
   }
   return string(byteFlatten(lines))
+}
+
+type rowStream struct {
+  Rows
+}
+
+func (r rowStream) Next(ptr interface{}) bool {
+  if !r.Rows.Next() {
+    return false
+  }
+  ptrs := ptr.(Tuple).Ptrs()
+  if err := r.Scan(ptrs...); err != nil {
+    panic(err)
+  }
+  return true
 }
 
 type funcFilterer func(ptr interface{}) bool
