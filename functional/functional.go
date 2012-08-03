@@ -101,7 +101,7 @@ func Slice(s Stream, start int, end int) Stream {
 // Concat concatenates multiple Streams into one.
 // If x = (x1, x2, ...) and y = (y1, y2, ...) then
 // Concat(x, y) = (x1, x2, ..., y1, y2, ...)
-func Concat(s... Stream) Stream {
+func Concat(s ...Stream) Stream {
   return &concatStream{s, 0}
 }
 
@@ -110,7 +110,7 @@ func Concat(s... Stream) Stream {
 // Join(x, y) = ((x1, y1), (x2, y2), ...). 
 // The Stream Join returns quits emitting whenever one of the input Streams
 // runs out.
-func Join(s... Stream) Stream {
+func Join(s ...Stream) Stream {
   return &joinStream{s, false}
 }
 
@@ -174,7 +174,7 @@ func AppendPtrs(s Stream, slicePtr interface{}, c Creater) {
 
 // Any returns a Filterer that returns true if any of the
 // fs return true.
-func Any(fs... Filterer) Filterer {
+func Any(fs ...Filterer) Filterer {
   ors := make([][]Filterer, len(fs))
   for i := range fs {
     ors[i] = orList(fs[i])
@@ -184,7 +184,7 @@ func Any(fs... Filterer) Filterer {
 
 // All returns a Filterer that returns true if all of the
 // fs return true.
-func All(fs... Filterer) Filterer {
+func All(fs ...Filterer) Filterer {
   ands := make([][]Filterer, len(fs))
   for i := range fs {
     ands[i] = andList(fs[i])
