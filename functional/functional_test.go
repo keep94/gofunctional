@@ -272,9 +272,9 @@ func TestTakeWhileFull(t *testing.T) {
   }
 }
 
-func TestLines(t *testing.T) {
+func TestReadLines(t *testing.T) {
   r := strings.NewReader("Now is\nthe time\nfor all good men.\n")
-  s := Lines(r)
+  s := ReadLines(r)
   var results[] string
   AppendValues(s, &results)
   if output := strings.Join(results,","); output != "Now is,the time,for all good men."  {
@@ -282,9 +282,9 @@ func TestLines(t *testing.T) {
   }
 }
 
-func TestLinesLongLine(t *testing.T) {
+func TestReadLinesLongLine(t *testing.T) {
   str := strings.Repeat("a", 4001) + strings.Repeat("b", 4001) + strings.Repeat("c", 4001) + "\n" + "foo"
-  s := Lines(strings.NewReader(str))
+  s := ReadLines(strings.NewReader(str))
   var results[] string
   AppendValues(s, &results)
   if results[0] != str[0:12003] {
@@ -298,9 +298,9 @@ func TestLinesLongLine(t *testing.T) {
   }
 }
 
-func TestLineLinesLongLine2(t *testing.T) {
+func TestReadLinesLongLine2(t *testing.T) {
   str := strings.Repeat("a", 4001) + strings.Repeat("b", 4001) + strings.Repeat("c", 4001)
-  s := Lines(strings.NewReader(str))
+  s := ReadLines(strings.NewReader(str))
   var results[] string
   AppendValues(s, &results)
   if results[0] != str {

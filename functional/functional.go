@@ -128,10 +128,10 @@ func DropWhile(f Filterer, s Stream) Stream {
   return &dropStream{f, s, false}
 }
 
-// Lines returns the lines of text in r as a Stream of string types.
+// ReadLines returns the lines of text in r as a Stream of string types.
 // The returned lines are separated by either \n or \r\n. The emitted
 // string types do not contain the end of line characters.
-func Lines(r io.Reader) Stream {
+func ReadLines(r io.Reader) Stream {
   return lineStream{bufio.NewReader(r)}
 }
 
