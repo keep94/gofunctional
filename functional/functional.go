@@ -146,7 +146,7 @@ func ReadLines(r io.Reader) Stream {
 
 // ReadRows returns the rows in a database table as a Stream of Tuple types.
 func ReadRows(r Rows) Stream {
-  return rowStream{r}
+  return &rowStream{r}
 }
 
 // AppendValues evaluates s and places each element in s
@@ -408,7 +408,7 @@ type rowStream struct {
   Rows
 }
 
-func (r rowStream) Next(ptr interface{}) bool {
+func (r *rowStream) Next(ptr interface{}) bool {
   if !r.Rows.Next() {
     return false
   }
