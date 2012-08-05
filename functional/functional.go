@@ -44,11 +44,8 @@ type Mapper interface {
   Fast() Mapper
 }
 
-// Creater creates a new instance.
-type Creater interface {
-  // Create creates a new instance. Returns a pointer to the new instance.
-  Create() interface{}
-}
+// Creater creates a new instance and returns a pointer to it.
+type Creater func() interface {}
 
 // Rows represents rows in a database table
 type Rows interface {
@@ -67,7 +64,7 @@ func Map(f Mapper, s Stream, c Creater) Stream {
   if ok {
     return &mapStream{Compose(f, ms.mapper, c).Fast(), ms.stream, ms.ptr}
   }
-  return &mapStream{f.Fast(), s, c.Create()}
+  return &mapStream{f.Fast(), s, c()}
 }
 
 // Filter filters values from s and returns the resulting Stream.
@@ -213,18 +210,6 @@ func NewFilterer(f func(ptr interface{}) bool) Filterer {
 // NewMapper returns a new Mapper
 func NewMapper(m func(srcPtr interface{}, destPtr interface{}) bool) Mapper {
   return funcMapper(m)
-}
-
-// NewCreater returns a creater that simply returns a pointer to new storage.
-// returned pointer is of same type as ptr.
-func NewCreater(ptr interface{}) Creater {
-  valueType := reflect.TypeOf(ptr).Elem()
-  return simpleCreater{valueType}
-}
-
-// NewCreater from func returns a creater that delegates to f.
-func NewCreaterFromFunc(f func() interface{}) Creater {
-  return funcCreater{f}
 }
 
 type count struct {
@@ -492,32 +477,16 @@ func (m *compositeMapper) Fast() Mapper {
 func (m *compositeMapper) createValues() []interface{} {
   result := make([]interface{}, len(m.creaters))
   for i := range m.creaters {
-    result[i] = m.creaters[i].Create()
+    result[i] = m.creaters[i]()
   }
   return result
 }
 
-type simpleCreater struct {
-  reflect.Type
-}
-
-func (c simpleCreater) Create() interface{} {
-  return reflect.New(c.Type).Interface()
-}
-
-type funcCreater struct {
-  f func() interface{}
-}
-
-func (c funcCreater) Create() interface{} {
-  return c.f()
-}
-
 func appendPtrs(s Stream, c Creater, sliceValue reflect.Value) reflect.Value {
-  value := c.Create()
+  value := c()
   for s.Next(value) {
     sliceValue = reflect.Append(sliceValue, reflect.ValueOf(value))
-    value = c.Create()
+    value = c()
   }
   return sliceValue
 }

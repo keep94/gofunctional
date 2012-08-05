@@ -63,9 +63,9 @@ func main() {
   s = functional.Map(
           functional.NewMapper(computeRatio),
           s, 
-          functional.NewCreaterFromFunc(func() interface{} {
+          func() interface{} {
            return &fibWithIndex{0, new(big.Int)}
-          }))
+          })
   
   // Index and ratio from 40th up to 49th fibonacci number.
   s = functional.Slice(s, 40, 50)

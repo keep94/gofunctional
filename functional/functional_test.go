@@ -23,7 +23,7 @@ func TestFilterAndMap(t *testing.T) {
     *d = int32((*s) * (*s))
     return true
   })
-  s = Map(m, Filter(f, s), NewCreater(new(int)))
+  s = Map(m, Filter(f, s), func() interface{} { return new(int)})
   var results []int32
   AppendValues(s, &results)
   if output := fmt.Sprintf("%v", results); output != "[36 64 100 144 196]"  {
@@ -43,7 +43,7 @@ func TestCombineFilterMap(t *testing.T) {
     return true
   })
   var results []int64
-  AppendValues(Map(doubleInt32Int64, Map(m, s, NewCreater(new(int))), NewCreater(new(int32))), &results)
+  AppendValues(Map(doubleInt32Int64, Map(m, s, func() interface{} { return new(int)}), func() interface{} { return new(int32)}), &results)
   if output := fmt.Sprintf("%v", results); output != "[72 128 200 288 392]"  {
     t.Errorf("Expected [64 128 200 288 392] got %v", output)
   }
@@ -67,8 +67,8 @@ func TestNestedFilter(t *testing.T) {
 }
 
 func TestNoMapInMap(t *testing.T) {
-  s := Map(squareIntInt32, xrange(3, 6), NewCreater(new(int)))
-  s = Map(doubleInt32Int64, s, NewCreater(new(int32)))
+  s := Map(squareIntInt32, xrange(3, 6), func() interface{} { return new(int)})
+  s = Map(doubleInt32Int64, s, func() interface{} { return new(int32)})
   _, mapInMap := s.(*mapStream).stream.(*mapStream)
   if mapInMap {
     t.Error("Got a map within a map.")
@@ -76,8 +76,8 @@ func TestNoMapInMap(t *testing.T) {
 }
 
 func TestNestedMap(t *testing.T) {
-  s := Map(squareIntInt32, xrange(3, 6), NewCreater(new(int)))
-  s = Map(doubleInt32Int64, s, NewCreater(new(int32)))
+  s := Map(squareIntInt32, xrange(3, 6), func() interface{} { return new(int)})
+  s = Map(doubleInt32Int64, s, func() interface{} { return new(int32)})
   var results []int64
   AppendValues(s, &results)
   if output := fmt.Sprintf("%v", results); output != "[18 32 50]"  {
@@ -155,7 +155,7 @@ func TestSliceStartBiggerThanEnd(t *testing.T) {
 
 func TestAppendPtrs(t *testing.T) {
   var results []*int
-  AppendPtrs(xrange(1, 3), &results, NewCreater(new(int)))
+  AppendPtrs(xrange(1, 3), &results, func() interface{} { return new(int)})
   if *results[0] != 1 || *results[1] != 2 {
     t.Error("Wrong slice of pointers returned")
   }
@@ -428,8 +428,8 @@ func TestCompose(t *testing.T) {
   h := int64Plus1
   var i32 int32
   var i64 int64
-  c := Compose(g, f, NewCreater(&i32))
-  c = Compose(h, c, NewCreater(&i64))
+  c := Compose(g, f, func() interface{} { return new(int32)})
+  c = Compose(h, c, func() interface{} { return new(int64)})
   if x := len(c.(*compositeMapper).mappers); x != 3 {
     t.Error("Composition of composite mapper wrong.")
   }
