@@ -161,6 +161,14 @@ func TestAppendPtrs(t *testing.T) {
   }
 }
 
+func TestAppendPtrsNilCreater(t *testing.T) {
+  var results []*int
+  AppendPtrs(xrange(1, 3), &results, nil)
+  if *results[0] != 1 || *results[1] != 2 {
+    t.Error("Wrong slice of pointers returned")
+  }
+}
+
 func TestCountFrom(t *testing.T) {
   var results []int
   AppendValues(Slice(CountFrom(5, 2), 1, 3), &results)

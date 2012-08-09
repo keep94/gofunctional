@@ -159,14 +159,19 @@ func AppendValues(s Stream, slicePtr interface{}) {
 // AppendPtrs evaluates s and places each element in s in the slice that
 // slicePtr points to. If s emits elements of type T, then the slice that
 // slicePtr points to must be of type []*T. c creates the instances that 
-// the *T's point to.
+// the *T's point to. If c is nil, AppendPtrs uses the new function to create
+// the instances.
 func AppendPtrs(s Stream, slicePtr interface{}, c Creater) {
   sliceValue := getSliceValue(slicePtr)
   sliceElementType := sliceValue.Type().Elem()
   if sliceElementType.Kind() != reflect.Ptr {
     panic("slicePtr must point to a slice of pointers.")
   }
-  sliceValue.Set(appendPtrs(s, c, sliceValue))
+  if c == nil {
+    sliceValue.Set(appendPtrs(s, sliceElementType.Elem(), sliceValue))
+  } else {
+    sliceValue.Set(appendPtrsWithCreater(s, c, sliceValue))
+  }
 }
 
 // Any returns a Filterer that returns true if any of the
@@ -482,7 +487,8 @@ func (m *compositeMapper) createValues() []interface{} {
   return result
 }
 
-func appendPtrs(s Stream, c Creater, sliceValue reflect.Value) reflect.Value {
+func appendPtrsWithCreater(
+    s Stream, c Creater, sliceValue reflect.Value) reflect.Value {
   value := c()
   for s.Next(value) {
     sliceValue = reflect.Append(sliceValue, reflect.ValueOf(value))
@@ -491,7 +497,22 @@ func appendPtrs(s Stream, c Creater, sliceValue reflect.Value) reflect.Value {
   return sliceValue
 }
 
-func appendValues(s Stream, sliceElementType reflect.Type, sliceValue reflect.Value) reflect.Value {
+func appendPtrs(
+    s Stream,
+    sliceElementType reflect.Type,
+    sliceValue reflect.Value) reflect.Value {
+  value := reflect.New(sliceElementType)
+  for s.Next(value.Interface()) {
+    sliceValue = reflect.Append(sliceValue, value)
+    value = reflect.New(sliceElementType)
+  }
+  return sliceValue
+}
+
+func appendValues(
+    s Stream,
+    sliceElementType reflect.Type,
+    sliceValue reflect.Value) reflect.Value {
   value := reflect.New(sliceElementType)
   for s.Next(value.Interface()) {
     sliceValue = reflect.Append(sliceValue, reflect.Indirect(value))
