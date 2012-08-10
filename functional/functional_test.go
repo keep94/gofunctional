@@ -23,7 +23,7 @@ func TestFilterAndMap(t *testing.T) {
     *d = int32((*s) * (*s))
     return true
   })
-  s = Map(m, Filter(f, s), func() interface{} { return new(int)})
+  s = Map(m, Filter(f, s), new(int))
   var results []int32
   AppendValues(s, &results)
   if output := fmt.Sprintf("%v", results); output != "[36 64 100 144 196]"  {
@@ -43,7 +43,7 @@ func TestCombineFilterMap(t *testing.T) {
     return true
   })
   var results []int64
-  AppendValues(Map(doubleInt32Int64, Map(m, s, func() interface{} { return new(int)}), func() interface{} { return new(int32)}), &results)
+  AppendValues(Map(doubleInt32Int64, Map(m, s, new(int)), new(int32)), &results)
   if output := fmt.Sprintf("%v", results); output != "[72 128 200 288 392]"  {
     t.Errorf("Expected [64 128 200 288 392] got %v", output)
   }
@@ -67,8 +67,8 @@ func TestNestedFilter(t *testing.T) {
 }
 
 func TestNoMapInMap(t *testing.T) {
-  s := Map(squareIntInt32, xrange(3, 6), func() interface{} { return new(int)})
-  s = Map(doubleInt32Int64, s, func() interface{} { return new(int32)})
+  s := Map(squareIntInt32, xrange(3, 6), new(int))
+  s = Map(doubleInt32Int64, s, new(int32))
   _, mapInMap := s.(*mapStream).stream.(*mapStream)
   if mapInMap {
     t.Error("Got a map within a map.")
@@ -76,8 +76,8 @@ func TestNoMapInMap(t *testing.T) {
 }
 
 func TestNestedMap(t *testing.T) {
-  s := Map(squareIntInt32, xrange(3, 6), func() interface{} { return new(int)})
-  s = Map(doubleInt32Int64, s, func() interface{} { return new(int32)})
+  s := Map(squareIntInt32, xrange(3, 6), new(int))
+  s = Map(doubleInt32Int64, s, new(int32))
   var results []int64
   AppendValues(s, &results)
   if output := fmt.Sprintf("%v", results); output != "[18 32 50]"  {

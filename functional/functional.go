@@ -38,9 +38,9 @@ type Mapper interface {
   // mapped value is stored in destPtr. srcPtr and destPtr must be pointer
   // types. If Mapper returns false, then no mapped value stored at destPtr.
   Map(srcPtr interface{}, destPtr interface{}) bool
-  // Returns a thread unsafe version of this Mapper. In particular any instances
-  // needed to hold intermediate values are creaed in advance and reused in
-  // each call to Map.
+  // Returns an optimized version of the Mapper that may be thread-unsafe.
+  // In particular any instances needed to hold intermediate values may be
+  // created in advance in returned Map.
   Fast() Mapper
 }
 
@@ -58,13 +58,13 @@ type Rows interface {
 
 // Map applies f to s and returns the new Stream. If s is
 // (x1, x2, x3, ...), Map returns the Stream (f(x1), f(x2), f(x3), ...).
-// c creates the instance that s emits to.
-func Map(f Mapper, s Stream, c Creater) Stream {
+// Intermediate values from s are stored at ptr.
+func Map(f Mapper, s Stream, ptr interface{}) Stream {
   ms, ok := s.(*mapStream)
   if ok {
-    return &mapStream{Compose(f, ms.mapper, c).Fast(), ms.stream, ms.ptr}
+    return &mapStream{Compose(f, ms.mapper, newCreater(ptr)).Fast(), ms.stream, ms.ptr}
   }
-  return &mapStream{f.Fast(), s, c()}
+  return &mapStream{f.Fast(), s, ptr}
 }
 
 // Filter filters values from s and returns the resulting Stream.
@@ -476,13 +476,21 @@ func (m *compositeMapper) Fast() Mapper {
   if m.values != nil {
     return m
   }
-  return &compositeMapper{m.mappers, m.creaters, m.createValues()}
+  return &compositeMapper{m.fastMappers(), m.creaters, m.createValues()}
 }
 
 func (m *compositeMapper) createValues() []interface{} {
   result := make([]interface{}, len(m.creaters))
   for i := range m.creaters {
     result[i] = m.creaters[i]()
+  }
+  return result
+}
+
+func (m *compositeMapper) fastMappers() []Mapper {
+  result := make([]Mapper, len(m.mappers))
+  for i := range m.mappers {
+    result[i] = m.mappers[i].Fast()
   }
   return result
 }
@@ -594,3 +602,8 @@ func byteFlatten(b [][]byte) []byte {
   return result
 }
 
+func newCreater(ptr interface{}) Creater {
+  return func() interface{} {
+    return ptr;
+  }
+}
