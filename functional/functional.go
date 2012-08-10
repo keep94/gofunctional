@@ -38,9 +38,11 @@ type Mapper interface {
   // mapped value is stored in destPtr. srcPtr and destPtr must be pointer
   // types. If Mapper returns false, then no mapped value stored at destPtr.
   Map(srcPtr interface{}, destPtr interface{}) bool
-  // Returns an optimized version of the Mapper that may be thread-unsafe.
-  // In particular any instances needed to hold intermediate values may be
-  // created in advance in returned Map.
+  // Returns an optimized version of the Mapper.
+  // Returned Mapper should be considered not thread-safe even if this
+  // Mapper is thread-safe. In particular, returned Mapper may re-use
+  // temporary storage rather than creating it anew when Map is invoked on
+  // it.
   Fast() Mapper
 }
 
@@ -195,8 +197,8 @@ func All(fs ...Filterer) Filterer {
 }
 
 // Compose composes two Mappers together into one e.g f(g(x)). c
-// creates instances to hold the results of g. Returned Mapper is
-// thread-safe.
+// creates instances to hold the results of g. Each time Map is called
+// on returned Mapper, it invokes c.
 func Compose(f Mapper, g Mapper, c Creater) Mapper {
   l := mapperLen(f) + mapperLen(g)
   mappers := make([]Mapper, l)
