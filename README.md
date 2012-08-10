@@ -1,8 +1,10 @@
 # gofunctional
 
-functional programming in go. The main data type, Stream, is similar to
+Functional programming in go. The main data type, Stream, is similar to
 a python iterator or generator. The methods found in here are similar to
 the methods found in the python itertools module.
+
+## Using
 
 	import "github.com/keep94/gofunctional/functional"
 

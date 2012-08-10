@@ -38,18 +38,20 @@ type Mapper interface {
   // mapped value is stored in destPtr. srcPtr and destPtr must be pointer
   // types. If Mapper returns false, then no mapped value stored at destPtr.
   Map(srcPtr interface{}, destPtr interface{}) bool
-  // Returns an optimized version of the Mapper.
-  // Returned Mapper should be considered not thread-safe even if this
-  // Mapper is thread-safe. In particular, returned Mapper may re-use
-  // temporary storage rather than creating it anew when Map is invoked on
-  // it.
+  // Fast returns an optimized version of this Mapper. If a function will use
+  // a Mapper more than once, say in a for loop, it should call Fast and use
+  // the returned Mapper instead. Returned Mapper should be considered not
+  // thread-safe even if this Mapper is. In particular, returned Mapper may
+  // re-use temporary storage rather than creating it anew when Map is invoked
+  // on it. Most implementations can simply return themselves.
   Fast() Mapper
 }
 
 // Creater creates a new instance and returns a pointer to it.
 type Creater func() interface {}
 
-// Rows represents rows in a database table
+// Rows represents rows in a database table. Most database API already have
+// a type that implements this interface
 type Rows interface {
   // Next advances to the next row. Next returns false if there is no next row.
   // Every call to Scan, even the first one, must be preceded by a call to Next.
@@ -60,7 +62,8 @@ type Rows interface {
 
 // Map applies f to s and returns the new Stream. If s is
 // (x1, x2, x3, ...), Map returns the Stream (f(x1), f(x2), f(x3), ...).
-// Intermediate values from s are stored at ptr.
+// Intermediate values from s are stored at ptr. Clients need not pass f.Fast()
+// to Map because Map calls Fast internally.
 func Map(f Mapper, s Stream, ptr interface{}) Stream {
   ms, ok := s.(*mapStream)
   if ok {
