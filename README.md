@@ -13,7 +13,7 @@ the methods found in the python itertools module.
 ## Real World Example
 
 Suppose there are names and phone numbers of people stored in a sqlite
-database. The table has a name, and phone_number column.
+database. The table has a name and phone_number column.
 
 The person class would look like:
 
