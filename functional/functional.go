@@ -38,12 +38,12 @@ type Mapper interface {
   // mapped value is stored in destPtr. srcPtr and destPtr must be pointer
   // types. If Mapper returns false, then no mapped value stored at destPtr.
   Map(srcPtr interface{}, destPtr interface{}) bool
-  // Fast returns an optimized version of this Mapper. If a function will use
+  // Fast returns a faster version of this Mapper. If a function will use
   // a Mapper more than once, say in a for loop, it should call Fast and use
   // the returned Mapper instead. Returned Mapper should be considered not
-  // thread-safe even if this Mapper is. In particular, returned Mapper may
-  // re-use temporary storage rather than creating it anew when Map is invoked
-  // on it. Most implementations can simply return themselves.
+  // thread-safe even if this Mapper is. In particular, the returned Mapper
+  // may re-use temporary storage rather than creating it anew each time Map
+  // is invoked. Most implementations can simply return themselves.
   Fast() Mapper
 }
 
@@ -139,9 +139,9 @@ func DropWhile(f Filterer, s Stream) Stream {
   return &dropStream{f, s, false}
 }
 
-// ReadLines returns the lines of text in r as a Stream of string types.
-// The returned lines are separated by either \n or \r\n. The emitted
-// string types do not contain the end of line characters.
+// ReadLines returns the lines of text in r separated by either "\n" or "\r\n"
+// as a Stream of string types. The emitted string types do not contain the
+// end of line characters.
 func ReadLines(r io.Reader) Stream {
   return lineStream{bufio.NewReader(r)}
 }
