@@ -359,6 +359,63 @@ func TestReadRowsError(t *testing.T) {
   }()
 }
 
+func TestPartitionValues(t *testing.T) {
+  expectedValues := []string {"[0 1 2]", "[3 4 5]", "[6]"}
+  s := xrange(0, 7)
+  mySlice := make([]int, 3)
+  s = PartitionValues(s)
+  for i := 0; s.Next(&mySlice); i++ {
+    if output := fmt.Sprintf("%v", mySlice); output != expectedValues[i] {
+      t.Errorf("Expected %v but got %v", expectedValues[i], output)
+    }
+  }
+}
+
+func TestPartitionValuesEmpty(t *testing.T) {
+  s := xrange(0, 0)
+  mySlice := make([]int, 3)
+  s = PartitionValues(s)
+  if s.Next(&mySlice) {
+    t.Error("Next should return false on an empty Stream.")
+  }
+}
+
+func TestPartitionPtrs(t *testing.T) {
+  expectedValues := [][]int {{0, 1, 2}, {3, 4, 5}, {6}}
+  s := xrange(0, 7)
+  mySlice := make([]*int, 3)
+  InitSlicePtrs(&mySlice, nil)
+  s = PartitionPtrs(s)
+  for i := 0; s.Next(&mySlice); i++ {
+    if len(mySlice) != len(expectedValues[i]) {
+      t.Errorf("Expected length %v but got %v", len(expectedValues[i]), len(mySlice))
+    }
+    for j := range mySlice {
+      if *mySlice[j] != expectedValues[i][j] {
+        t.Errorf("Expected %v but got %v", expectedValues[i][j], *mySlice[j])
+      }
+    }
+  }
+}
+
+func TestPartitionPtrsEmpty(t *testing.T) {
+  s := xrange(0, 0)
+  mySlice := make([]*int, 3)
+  InitSlicePtrs(&mySlice, nil)
+  s = PartitionValues(s)
+  if s.Next(&mySlice) {
+    t.Error("Next should return false on an empty Stream.")
+  }
+}
+
+func TestInitSlicePtrs(t *testing.T) {
+  mySlice := make([]*int, 3)
+  InitSlicePtrs(&mySlice, func() interface{} { return new(int) })
+  if *mySlice[0] != 0 || *mySlice[1] != 0 || *mySlice[2] != 0 {
+    t.Error("InitSlicePtrs failed")
+  }
+}
+  
 
 func TestAny(t *testing.T) {
   a := Any(equal(1), equal(2))

@@ -12,7 +12,7 @@ import (
 // Each call to Next() evaluates the next value in the stream.
 type Stream interface {
   // Next evaluates the next value in this Stream.
-  // If Next returns true, the next value is stored at ptr;
+  // If Next returns true, the next value is stored at ptr.
   // If Next returns false, then the end of the Stream has been reached,
   // and the value ptr points to is unspecified. ptr must be a
   // pointer type
@@ -151,8 +151,29 @@ func ReadRows(r Rows) Stream {
   return rowStream{r}
 }
 
-// AppendValues evaluates s and places each element in s
-// in the slice that slicePtr points to.
+// PartitionValues returns a Stream that emits the values in s as slices of
+// fixed size of type []T. When calling Next on the returned Stream, pass a
+// pointer pointing to a slice of type []T. The returned Stream
+// fills this slice with values with each call to Next.  If s runs out before
+// returned Stream can completly fill the slice, it writes a smaller slice
+// with just the remaining values to the pointer passed to Next.
+func PartitionValues(s Stream) Stream {
+  return partitionValuesStream{s}
+}
+
+// PartitionPtrs returns a Stream that emits the values in s as slices of
+// fixed size of type []*T. When calling Next on returned Stream, pass a
+// pointer pointing to a slice of type []*T that has already been initialized
+// with InitSlicePtrs.  The returned Stream fills this slice with values with
+// each call to Next. If s runs out before returned Stream can completely
+// fill the slice, it writes a smaller slice with just the remaining values
+// to the pointer passed to Next.
+func PartitionPtrs(s Stream) Stream {
+  return partitionPtrsStream{s}
+}
+
+// AppendValues evaluates s and appends each element in s
+// to the slice that slicePtr points to.
 // If s emits elements of type T, then the slice that slicePtr points
 // to must be of type []T.  
 func AppendValues(s Stream, slicePtr interface{}) {
@@ -161,7 +182,7 @@ func AppendValues(s Stream, slicePtr interface{}) {
   sliceValue.Set(appendValues(s, sliceElementType, sliceValue))
 }
 
-// AppendPtrs evaluates s and places each element in s in the slice that
+// AppendPtrs evaluates s and appends each element in s to the slice that
 // slicePtr points to. If s emits elements of type T, then the slice that
 // slicePtr points to must be of type []*T. c creates the instances that 
 // the *T's point to. If c is nil, AppendPtrs uses the new function to create
@@ -169,14 +190,34 @@ func AppendValues(s Stream, slicePtr interface{}) {
 func AppendPtrs(s Stream, slicePtr interface{}, c Creater) {
   sliceValue := getSliceValue(slicePtr)
   sliceElementType := sliceValue.Type().Elem()
-  if sliceElementType.Kind() != reflect.Ptr {
-    panic("slicePtr must point to a slice of pointers.")
-  }
+  assertPtrType(sliceElementType)
   if c == nil {
     sliceValue.Set(appendPtrs(s, sliceElementType.Elem(), sliceValue))
   } else {
     sliceValue.Set(appendPtrsWithCreater(s, c, sliceValue))
   }
+}
+
+// InitSlicePtrs initializes the slice of type []*T that slicePtr points
+// to by having each element in the slice point to a new T.  c creates each
+// T instance. If c is nil, new(T) is used to create each T instance.
+// InitSlicePtrs returns the same slicePtr passed to it.
+func InitSlicePtrs(slicePtr interface{}, c Creater) interface{} {
+  sliceValue := getSliceValue(slicePtr)
+  sliceElementType := sliceValue.Type().Elem()
+  assertPtrType(sliceElementType)
+  length := sliceValue.Len()
+  var creater func() reflect.Value
+  if c != nil {
+    creater = func() reflect.Value { return reflect.ValueOf(c()) }
+  } else {
+    sliceElementValueType := sliceElementType.Elem()
+    creater = func() reflect.Value { return reflect.New(sliceElementValueType) }
+  }
+  for i := 0; i < length; i++ {
+    sliceValue.Index(i).Set(creater())
+  }
+  return slicePtr
 }
 
 // Any returns a Filterer that returns true if any of the
@@ -414,6 +455,29 @@ func (r rowStream) Next(ptr interface{}) bool {
   return true
 }
 
+type partitionValuesStream struct {
+  Stream
+}
+
+func (s partitionValuesStream) Next(slicePtr interface{}) bool {
+  sliceValue := getSliceValue(slicePtr)
+  return nextSlice(s.Stream, sliceValue, func(v reflect.Value) interface{} {
+    return v.Addr().Interface()
+  })
+}
+
+type partitionPtrsStream struct {
+  Stream
+}
+
+func (s partitionPtrsStream) Next(slicePtr interface{}) bool {
+  sliceValue := getSliceValue(slicePtr)
+  assertPtrType(sliceValue.Type().Elem())
+  return nextSlice(s.Stream, sliceValue, func(v reflect.Value) interface{} {
+    return v.Interface()
+  })
+}
+
 type funcFilterer func(ptr interface{}) bool
 
 func (f funcFilterer) Filter(ptr interface{}) bool {
@@ -609,6 +673,29 @@ func byteFlatten(b [][]byte) []byte {
 
 func newCreater(ptr interface{}) Creater {
   return func() interface{} {
-    return ptr;
+    return ptr
   }
+}
+
+func assertPtrType(t reflect.Type) {
+  if t.Kind() != reflect.Ptr {
+    panic("slicePtr must point to a slice of pointers.")
+  }
+}
+
+func nextSlice(s Stream, sliceValue reflect.Value, toInterface func(reflect.Value) interface{}) bool {
+  length := sliceValue.Len()
+  var idx int
+  for idx = 0; idx < length; idx++ {
+    if !s.Next(toInterface(sliceValue.Index(idx))) {
+      break
+    }
+  }
+  if idx == 0 {
+    return false
+  }
+  if idx < length {
+    sliceValue.Set(sliceValue.Slice(0, idx))
+  }
+  return true
 }
