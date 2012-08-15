@@ -364,10 +364,14 @@ func TestPartitionValues(t *testing.T) {
   s := xrange(0, 7)
   mySlice := make([]int, 3)
   s = PartitionValues(s)
-  for i := 0; s.Next(&mySlice); i++ {
+  var i int
+  for i = 0; s.Next(&mySlice); i++ {
     if output := fmt.Sprintf("%v", mySlice); output != expectedValues[i] {
       t.Errorf("Expected %v but got %v", expectedValues[i], output)
     }
+  }
+  if i != len(expectedValues) {
+    t.Errorf("Next terminated too soon")
   }
 }
 
@@ -386,7 +390,8 @@ func TestPartitionPtrs(t *testing.T) {
   mySlice := make([]*int, 3)
   InitSlicePtrs(&mySlice, nil)
   s = PartitionPtrs(s)
-  for i := 0; s.Next(&mySlice); i++ {
+  var i int
+  for i = 0; s.Next(&mySlice); i++ {
     if len(mySlice) != len(expectedValues[i]) {
       t.Errorf("Expected length %v but got %v", len(expectedValues[i]), len(mySlice))
     }
@@ -395,6 +400,9 @@ func TestPartitionPtrs(t *testing.T) {
         t.Errorf("Expected %v but got %v", expectedValues[i][j], *mySlice[j])
       }
     }
+  }
+  if i != len(expectedValues) {
+    t.Errorf("Next terminated too soon")
   }
 }
 
@@ -416,6 +424,54 @@ func TestInitSlicePtrs(t *testing.T) {
   }
 }
   
+func TestGroupBy(t *testing.T) {
+  s := Slice(CountFrom(6, 6), 0, 4)
+  k := func(x interface{}) interface{} {
+    p := x.(*int)
+    return *p / 10
+  }
+  expected := []groupByResult{{0, []int{6}}, {1, []int{12, 18}}, {2, []int{24}}}
+  s = GroupBy(s, k, new(int), nil)
+  var group *Group
+  var i int
+  for i = 0; s.Next(&group); i++ {
+    if key := group.Key().(int); key != expected[i].key {
+      t.Errorf("Expected key %v got %v", expected[i].key, key)
+    }
+    var results []int
+    AppendValues(group, &results)
+    expectedValues := fmt.Sprintf("%v", expected[i].values)
+    if output := fmt.Sprintf("%v", results); output != expectedValues {
+      t.Errorf("Expected values %v got %v", expectedValues, output)
+    }
+    if key := group.Key().(int); key != expected[i].key {
+      t.Errorf("Expected key %v got %v", expected[i].key, key)
+    }
+  }
+  if i != len(expected) {
+    t.Errorf("Next terminated too soon")
+  }
+}
+
+func TestGroupBySkipping(t *testing.T) {
+  s := Slice(CountFrom(6, 6), 0, 4)
+  k := func(x interface{}) interface{} {
+    p := x.(*int)
+    return *p / 10
+  }
+  expected := []int {0, 1, 2}
+  s = GroupBy(s, k, new(int), nil)
+  var group *Group
+  var i int
+  for i = 0; s.Next(&group); i++ {
+    if key := group.Key().(int); key != expected[i] {
+      t.Errorf("Expected key %v got %v", expected[i], key)
+    }
+  }
+  if i != len(expected) {
+    t.Errorf("Next terminated too soon")
+  }
+}
 
 func TestAny(t *testing.T) {
   a := Any(equal(1), equal(2))
@@ -559,7 +615,10 @@ func (f *fakeRowsError) Scan(args ...interface{}) error {
   return scanError
 }
   
-
+type groupByResult struct {
+  key int
+  values []int
+}
 
 func xrange(start, end int) Stream {
   return Slice(Count(), start, end)

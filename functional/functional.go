@@ -50,6 +50,13 @@ type Mapper interface {
 // Creater creates a new instance and returns a pointer to it.
 type Creater func() interface {}
 
+// Copier copies the value at src to dest.
+type Copier func(src, dest interface{})
+
+// KeyFunc returns a key from an instance. The key type should support
+// both equality and assignment e.g int, string
+type KeyFunc func(ptr interface{}) interface{}
+
 // Rows represents rows in a database table. Most database API already have
 // a type that implements this interface
 type Rows interface {
@@ -58,6 +65,69 @@ type Rows interface {
   Next() bool
   // Reads the values out of the current row. args are pointer types.
   Scan(args ...interface{}) error
+}
+
+// The Stream that GroupBy returns emits *Group.
+type Group struct {
+  s Stream
+  key interface{}
+  ptr interface{}
+  k KeyFunc
+  c Copier
+  keySet bool
+  ptrSaved bool
+  halted bool
+}
+
+// Next emits the next value with the same key storing the value at ptr.
+// If there are no more values, Next returns false.
+func (g *Group) Next(ptr interface{}) bool {
+  if g.halted {
+    return false
+  }
+  if g.ptrSaved {
+    g.copyValue(g.ptr, ptr)
+    g.ptrSaved = false
+    return true
+  }
+  if g.s.Next(ptr) {
+    if !g.isSameKey(g.k(ptr)) {
+      g.copyValue(ptr, g.ptr)
+      g.ptrSaved = true
+      g.halted = true
+      return false
+    }
+    return true
+  }
+  return false
+}
+      
+// Key returns the common key for this group
+func (g *Group) Key() interface{} {
+  return g.key
+}
+
+func (g *Group) copyValue(src, dest interface{}) {
+  if src == dest {
+    return
+  }
+  g.c(src, dest)
+}
+
+func (g *Group) isSameKey(key interface{}) bool {
+  return g.keySet && g.key == key
+}
+
+func (g *Group) advance() bool {
+  for g.Next(g.ptr) {
+  }
+  if g.halted {
+    g.halted = false
+    g.key = g.k(g.ptr)
+    g.keySet = true
+    return true
+  }
+  return false
 }
 
 // Map applies f to s and returns the new Stream. If s is
@@ -170,6 +240,24 @@ func PartitionValues(s Stream) Stream {
 // to the pointer passed to Next.
 func PartitionPtrs(s Stream) Stream {
   return partitionPtrsStream{s}
+}
+
+// GroupBy returns a Stream that emits the values in s grouped by key. k is
+// applied to each element in s to determine its key. The returned Stream
+// emits the groups as *Group instances. Each *Group instance is itself a
+// Stream that emits all the values with a given key. Each *Group instance is
+// valid until Next is called again on the returned Stream. Threfore callers
+// should not attempt to store all the *Group instanes in a slice. The values
+// in s must already be sorted by k. s must not be used directly once this
+// function is called. k is the key generating funtion which takes a pointer
+// and returns the key. ptr points to the same type that s emits and is used
+// as temporary storage. c is used to copy elements that s emits. If c is
+// nil, it means use the assignment operator.
+func GroupBy(s Stream, k KeyFunc, ptr interface{}, c Copier) Stream {
+  if c == nil {
+    c = assignCopier
+  }
+  return groupByStream{&Group{s: s, ptr: ptr, k: k, c: c}}
 }
 
 // AppendValues evaluates s and appends each element in s
@@ -478,6 +566,19 @@ func (s partitionPtrsStream) Next(slicePtr interface{}) bool {
   })
 }
 
+type groupByStream struct {
+  *Group
+}
+
+func (g groupByStream) Next(ptr interface{}) bool {
+  if !g.advance() {
+    return false
+  }
+  p := ptr.(**Group)
+  *p = g.Group
+  return true
+}
+
 type funcFilterer func(ptr interface{}) bool
 
 func (f funcFilterer) Filter(ptr interface{}) bool {
@@ -698,4 +799,13 @@ func nextSlice(s Stream, sliceValue reflect.Value, toInterface func(reflect.Valu
     sliceValue.Set(sliceValue.Slice(0, idx))
   }
   return true
+}
+
+func assignCopier(src, dest interface{}) {
+  srcP := reflect.ValueOf(src)
+  destP := reflect.ValueOf(dest)
+  if srcP.Kind() != reflect.Ptr || destP.Kind() != reflect.Ptr {
+    panic("src and dest must be pointer types.")
+  }
+  reflect.Indirect(destP).Set(reflect.Indirect(srcP))
 }
