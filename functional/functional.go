@@ -8,14 +8,25 @@ import (
   "reflect"
 )
 
-// Stream is a sequence of lazily produced values.
-// Each call to Next() evaluates the next value in the stream.
+// Stream is a sequence emitted values.
+// Each call to Next() emits the next value in the stream.
+// A Stream that emits values of type T is a Stream of T.
+// Because the client of a Stream of T may need save only a small
+// subset of the emitted values, to save the Stream from allocating memory
+// for each emitted T value, it is the client's responsibility to 
+// allocate memory to store the next emitted value. The client passes a
+// pointer, a *T, to Next to receive the next emitted value. If the
+// client does not want to store the previously emitted values, it is free 
+// to re-use the same *T with Next over and over again. If type T includes
+// resources that need to be pre-initialized, a Stream may require the client
+// to pass a pointer to a pre-initialized T to save the Stream from having to
+// initialize a T for every emitted value. Clients use the Creater type to
+// initialize a new T and get a *T pointer to it.
 type Stream interface {
-  // Next evaluates the next value in this Stream.
+  // Next emits the next value in this Stream of T.
   // If Next returns true, the next value is stored at ptr.
   // If Next returns false, then the end of the Stream has been reached,
-  // and the value ptr points to is unspecified. ptr must be a
-  // pointer type
+  // and the value ptr points to is unspecified. ptr must be a *T
   Next(ptr interface{}) bool
 }
 
@@ -25,18 +36,18 @@ type Tuple interface {
   Ptrs() []interface{}
 }
 
-// Filterer filters values in a Stream.
+// Filterer of T filters values in a Stream of T.
 type Filterer interface {
   // Filter returns true if value ptr points to should be included or false
-  // otherwise. ptr must be a pointer type
+  // otherwise. ptr must be a *T.
   Filter(ptr interface{}) bool
 }
 
-// Mapper maps one value to another in a Stream.
+// Mapper maps a type T value to a type U value in a Stream.
 type Mapper interface {
-  // Map does the mapping. srcPtr points to the original value, and the 
-  // mapped value is stored in destPtr. srcPtr and destPtr must be pointer
-  // types. If Mapper returns false, then no mapped value stored at destPtr.
+  // Map does the mapping storing the mapped value at destPtr.
+  // If Mapper returns false, then no mapped value is stored at destPtr.
+  // srcPtr is a *T; destPtr is a *U
   Map(srcPtr interface{}, destPtr interface{}) bool
   // Fast returns a faster version of this Mapper. If a function will use
   // a Mapper more than once, say in a for loop, it should call Fast and use
@@ -47,14 +58,16 @@ type Mapper interface {
   Fast() Mapper
 }
 
-// Creater creates a new instance and returns a pointer to it.
+// Creater of T creates a new, pre-initialized, T and returns a pointer to it.
 type Creater func() interface {}
 
-// Copier copies the value at src to dest.
+// Copier of T copies the value at src to the value at dest. This type is
+// often needed when values of type T need to be pre-initialized. src and
+// dest are of type *T and both point to pre-initialized T.
 type Copier func(src, dest interface{})
 
-// KeyFunc returns a key from an instance. The key type should support
-// both equality and assignment e.g int, string
+// KeyFunc of T returns a key for a type T. The key type should support
+// both equality and assignment e.g int, string. ptr is a type *T. 
 type KeyFunc func(ptr interface{}) interface{}
 
 // Rows represents rows in a database table. Most database API already have
@@ -67,7 +80,7 @@ type Rows interface {
   Scan(args ...interface{}) error
 }
 
-// The Stream that GroupBy returns emits *Group.
+// Group of T is a Stream of T that have a common key.
 type Group struct {
   s Stream
   key interface{}
@@ -79,7 +92,7 @@ type Group struct {
   halted bool
 }
 
-// Next emits the next value with the same key storing the value at ptr.
+// Next emits the next value of type T. ptr is a *T.
 // If there are no more values, Next returns false.
 func (g *Group) Next(ptr interface{}) bool {
   if g.halted {
@@ -102,7 +115,7 @@ func (g *Group) Next(ptr interface{}) bool {
   return false
 }
       
-// Key returns the common key for this group
+// Key returns the common key for this Group
 func (g *Group) Key() interface{} {
   return g.key
 }
@@ -130,10 +143,13 @@ func (g *Group) advance() bool {
   return false
 }
 
-// Map applies f to s and returns the new Stream. If s is
+// Map applies f, which maps a type T value to a type U value, to a Stream
+// of T producing a new Stream of U. If s is
 // (x1, x2, x3, ...), Map returns the Stream (f(x1), f(x2), f(x3), ...).
-// Intermediate values from s are stored at ptr. Clients need not pass f.Fast()
-// to Map because Map calls Fast internally.
+// if f returns false for a T value, then the corresponding U value is left
+// out of the returned stream. ptr is a *T providing storage for emitted values
+// from s. Clients need not pass f.Fast() to Map because Map calls Fast
+// internally.
 func Map(f Mapper, s Stream, ptr interface{}) Stream {
   ms, ok := s.(*mapStream)
   if ok {
@@ -142,8 +158,8 @@ func Map(f Mapper, s Stream, ptr interface{}) Stream {
   return &mapStream{f.Fast(), s, ptr}
 }
 
-// Filter filters values from s and returns the resulting Stream.
-// Filter f will return true for each value in the returned Stream.
+// Filter filters values from s, returning a new Stream of T.
+// f is a Filterer of T; s is a Stream of T.
 func Filter(f Filterer, s Stream) Stream {
   fs, ok := s.(*filterStream)
   if ok {
@@ -152,13 +168,14 @@ func Filter(f Filterer, s Stream) Stream {
   return &filterStream{f, s}
 }
 
-// Count returns the infinite stream of integers beginning at 0.
+// Count returns an infinite Stream of int which emits all values beginning
+// at 0.
 func Count() Stream {
   return &count{0, 1}
 }
 
-// CountFrom returns the infinite stream of integers beginning at start
-// and increasing by step.
+// CountFrom returns an infinite Stream of int emitting values beginning at
+// start and increasing by step.
 func CountFrom(start, step int) Stream {
   return &count{start, step}
 }
@@ -189,7 +206,8 @@ func Join(s ...Stream) Stream {
 // Cycle emits the elements in the given slice over and over again.
 // Cycle([]int {3, 5}) = (3, 5, 3, 5, ...)
 // The Stream Cycle returns owns the passed in slice, so clients should not
-// later modify the slice passed to Cycle.
+// later modify the slice passed to Cycle. If aSlice is a []T then Cycle
+// returns a Stream of T.
 func Cycle(aSlice interface{}) Stream {
   sliceValue := reflect.ValueOf(aSlice)
   if sliceValue.Kind() != reflect.Slice {
@@ -199,60 +217,61 @@ func Cycle(aSlice interface{}) Stream {
 }
 
 // TakeWhile returns a Stream that emits the values in s until f is false.
+// f is a Filterer of T; s is a Stream of T.
 func TakeWhile(f Filterer, s Stream) Stream {
   return &takeStream{f, s, false}
 }
 
 // DropWhile returns a Stream that emits the values in s starting at the
-// first value where f is false.
+// first value where f is false. f is a Filterer of T; s is a Stream of T.
 func DropWhile(f Filterer, s Stream) Stream {
   return &dropStream{f, s, false}
 }
 
 // ReadLines returns the lines of text in r separated by either "\n" or "\r\n"
-// as a Stream of string types. The emitted string types do not contain the
+// as a Stream of string. The emitted string types do not contain the
 // end of line characters.
 func ReadLines(r io.Reader) Stream {
   return lineStream{bufio.NewReader(r)}
 }
 
-// ReadRows returns the rows in a database table as a Stream of Tuple types.
+// ReadRows returns the rows in a database table as a Stream of Tuple.
 func ReadRows(r Rows) Stream {
   return rowStream{r}
 }
 
-// PartitionValues returns a Stream that emits the values in s as slices of
-// fixed size of type []T. When calling Next on the returned Stream, pass a
-// pointer pointing to a slice of type []T. The returned Stream
-// fills this slice with values with each call to Next.  If s runs out before
-// returned Stream can completly fill the slice, it writes a smaller slice
-// with just the remaining values to the pointer passed to Next.
+// PartitionValues converts a Stream of T to a Stream of []T where each
+// emitted value has same length. When calling Next on the returned Stream,
+// pass a pointer pointing to a slice of type []T initialized with make.
+// The returned Stream fills this slice with values with each call to Next.
+// If s runs out before returned Stream can completly fill the slice, it
+// emits a smaller slice with just the remaining values to the pointer
+// passed to Next.
 func PartitionValues(s Stream) Stream {
   return partitionValuesStream{s}
 }
 
-// PartitionPtrs returns a Stream that emits the values in s as slices of
-// fixed size of type []*T. When calling Next on returned Stream, pass a
-// pointer pointing to a slice of type []*T that has already been initialized
-// with InitSlicePtrs.  The returned Stream fills this slice with values with
+// PartitionPtrs converts a Stream of T to a Stream of []*T where each
+// emitted value has same length. When calling Next on returned Stream,
+// pass a pointer pointing to a slice of type []*T initialized with make
+// and InitSlicePtrs. The returned Stream fills this slice with values with
 // each call to Next. If s runs out before returned Stream can completely
-// fill the slice, it writes a smaller slice with just the remaining values
+// fill the slice, it emits a smaller slice with just the remaining values
 // to the pointer passed to Next.
 func PartitionPtrs(s Stream) Stream {
   return partitionPtrsStream{s}
 }
 
-// GroupBy returns a Stream that emits the values in s grouped by key. k is
-// applied to each element in s to determine its key. The returned Stream
-// emits the groups as *Group instances. Each *Group instance is itself a
-// Stream that emits all the values with a given key. Each *Group instance is
-// valid until Next is called again on the returned Stream. Threfore callers
-// should not attempt to store all the *Group instanes in a slice. The values
-// in s must already be sorted by k. s must not be used directly once this
-// function is called. k is the key generating funtion which takes a pointer
-// and returns the key. ptr points to the same type that s emits and is used
-// as temporary storage. c is used to copy elements that s emits. If c is
-// nil, it means use the assignment operator.
+// GroupBy returns a Stream of *Group that emits the T values in s grouped
+// by key. k is applied to each element in s to determine its key.
+// Each *Group instance is itself a Stream of T that emits all the values with
+// a given key. Each *Group instance is valid until Next is called again
+// on the returned Stream. Threfore callers should discard any previously
+// emitted *Group values. The values in s must already be sorted by k.
+// s must not be used directly once this function is called. k is the
+// key generating funtion which takes a *T pointer and returns the key.
+// ptr is a *T pointer providing storage for emitted values from s.
+// c is a Coper of T. If c is nil, it means use the assignment operator.
 func GroupBy(s Stream, k KeyFunc, ptr interface{}, c Copier) Stream {
   if c == nil {
     c = assignCopier
@@ -260,10 +279,8 @@ func GroupBy(s Stream, k KeyFunc, ptr interface{}, c Copier) Stream {
   return groupByStream{&Group{s: s, ptr: ptr, k: k, c: c}}
 }
 
-// AppendValues evaluates s and appends each element in s
-// to the slice that slicePtr points to.
-// If s emits elements of type T, then the slice that slicePtr points
-// to must be of type []T.  
+// AppendValues evaluates s and appends each element in s to the slice that
+// slicePtr points to. s is a Stream of T; slicePtr is a *[]T
 func AppendValues(s Stream, slicePtr interface{}) {
   sliceValue := getSliceValue(slicePtr)
   sliceElementType := sliceValue.Type().Elem()
@@ -271,10 +288,8 @@ func AppendValues(s Stream, slicePtr interface{}) {
 }
 
 // AppendPtrs evaluates s and appends each element in s to the slice that
-// slicePtr points to. If s emits elements of type T, then the slice that
-// slicePtr points to must be of type []*T. c creates the instances that 
-// the *T's point to. If c is nil, AppendPtrs uses the new function to create
-// the instances.
+// slicePtr points to. s is a Stream of T; slicePtr is a *[]*T.
+// c is a Creater of T. If c is nil, it means use the new built-in function.
 func AppendPtrs(s Stream, slicePtr interface{}, c Creater) {
   sliceValue := getSliceValue(slicePtr)
   sliceElementType := sliceValue.Type().Elem()
@@ -287,8 +302,8 @@ func AppendPtrs(s Stream, slicePtr interface{}, c Creater) {
 }
 
 // InitSlicePtrs initializes the slice of type []*T that slicePtr points
-// to by having each element in the slice point to a new T.  c creates each
-// T instance. If c is nil, new(T) is used to create each T instance.
+// to by having each element in the slice point to a new T.  c is a 
+// Creater of T. If c is nil, new(T) is used to create each T instance.
 // InitSlicePtrs returns the same slicePtr passed to it.
 func InitSlicePtrs(slicePtr interface{}, c Creater) interface{} {
   sliceValue := getSliceValue(slicePtr)
@@ -328,9 +343,13 @@ func All(fs ...Filterer) Filterer {
   return andFilterer(filterFlatten(ands))
 }
 
-// Compose composes two Mappers together into one e.g f(g(x)). c
-// creates instances to hold the results of g. Each time Map is called
-// on returned Mapper, it invokes c.
+// Compose composes two Mappers together into one e.g f(g(x)). If g maps
+// type T values to type U values, and f maps type U values to type V
+// values, then Compose returns a Mapper mapping T values to V values. c is
+// a Creater of U. Each time Map is called on returned Mapper, it invokes c
+// to create a U value to receive the intermediate result from g. Calling
+// Fast() on returned Mapper creates a new Mapper with this U value already
+// pre-initialized.
 func Compose(f Mapper, g Mapper, c Creater) Mapper {
   l := mapperLen(f) + mapperLen(g)
   mappers := make([]Mapper, l)
@@ -341,12 +360,15 @@ func Compose(f Mapper, g Mapper, c Creater) Mapper {
   return &compositeMapper{mappers, creaters, nil}
 }
 
-// NewFilterer returns a new Filter
+// NewFilterer returns a new Filterer of T. f takes a *T returning true
+// if T value pointed to it should be included.
 func NewFilterer(f func(ptr interface{}) bool) Filterer {
   return funcFilterer(f)
 }
 
-// NewMapper returns a new Mapper
+// NewMapper returns a new Mapper mapping T values to U Values. In f,
+// srcPtr is a *T and destPtr is a *U pointing to pre-allocated T and U
+// values respectively.
 func NewMapper(m func(srcPtr interface{}, destPtr interface{}) bool) Mapper {
   return funcMapper(m)
 }
