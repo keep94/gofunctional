@@ -216,6 +216,22 @@ func Cycle(aSlice interface{}) Stream {
   return &cycleStream{sliceValue, sliceValue.Len(), 0}
 }
 
+// NewStreamFromValues convers a []T into a Stream of T. aSlice is a []T.
+// The returned Stream owns the passed in slice, so clients should not later
+// modify it.
+func NewStreamFromValues(aSlice interface{}) Stream {
+  sliceValue := reflect.ValueOf(aSlice)
+  if sliceValue.Kind() != reflect.Slice {
+    panic("Slice argument expected")
+  }
+  return &plainStream{sliceValue, sliceValue.Len(), 0}
+}
+
+// Flatten converts a Stream of Stream of T into a Stream of T.
+func Flatten(s Stream) Stream {
+  return &flattenStream{stream: s}
+}
+
 // TakeWhile returns a Stream that emits the values in s until f is false.
 // f is a Filterer of T; s is a Stream of T.
 func TakeWhile(f Filterer, s Stream) Stream {
@@ -444,6 +460,25 @@ func (s *concatStream) Next(ptr interface{}) bool {
   return s.index < len(s.streams)
 }
 
+type flattenStream struct {
+  stream Stream
+  current Stream
+  done bool
+}
+
+func (s *flattenStream) Next(ptr interface{}) bool {
+  if s.done {
+    return false
+  }
+  for s.current == nil || !s.current.Next(ptr) {
+    if !s.stream.Next(&s.current) {
+      s.done = true
+      return false
+    }
+  }
+  return true
+}
+
 type joinStream struct {
   streams []Stream
   done bool
@@ -471,6 +506,22 @@ type cycleStream struct {
 
 func (s *cycleStream) Next(ptr interface{}) bool {
   value := s.sliceValue.Index(s.index % s.length)
+  reflect.Indirect(reflect.ValueOf(ptr)).Set(value)
+  s.index++
+  return true
+}
+
+type plainStream struct {
+  sliceValue reflect.Value
+  length int
+  index int
+}
+
+func (s *plainStream) Next(ptr interface{}) bool {
+  if s.index == s.length {
+    return false
+  }
+  value := s.sliceValue.Index(s.index)
   reflect.Indirect(reflect.ValueOf(ptr)).Set(value)
   s.index++
   return true

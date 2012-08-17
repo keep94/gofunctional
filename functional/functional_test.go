@@ -473,6 +473,30 @@ func TestGroupBySkipping(t *testing.T) {
   }
 }
 
+func TestFlatten(t *testing.T) {
+  if result := getNthDigit(15); result != 2 {
+    t.Errorf("Expected 2 got %v", result)
+  }
+  if result := getNthDigit(300); result != 6 {
+    t.Errorf("Expected 6 got %v", result)
+  }
+  if result := getNthDigit(188); result != 9 {
+    t.Errorf("Expected 9 got %v", result)
+  }
+}
+
+func TestFlattenWithEmptyStreams(t *testing.T) {
+  first := NewStreamFromValues([]int{})
+  second := NewStreamFromValues([]int{2})
+  third := NewStreamFromValues([]int{})
+  s := NewStreamFromValues([]Stream{first, second, third})
+  var results []int
+  AppendValues(Flatten(s), &results)
+  if output := fmt.Sprintf("%v", results); output != "[2]" {
+    t.Errorf("Expected [2] got %v", output)
+  }
+}
+
 func TestAny(t *testing.T) {
   a := Any(equal(1), equal(2))
   b := Any()
@@ -656,6 +680,49 @@ func ptrInt(x int) *int {
   return &x
 }
 
+// getNthDigit returns the nth digit in the sequence:
+// 12345678910111213141516... getNthDigit(1) == 1.
+func getNthDigit(x int) int {
+  s := Slice(digitStream(), x - 1, -1)
+  var result int
+  s.Next(&result)
+  return result
+}
+
+// digitStream returns a Stream of int = 1,2,3,4,5,6,7,8,9,1,0,1,1,...
+func digitStream() Stream {
+  return Flatten(Map(&intToDigitsMapper{}, Count(), new(int)))
+}
+
+// intToDigitsMapper converts an int into a Stream of int that emits its digits,
+// most significant first.
+type intToDigitsMapper struct {
+  digits []int
+}
+
+// Map maps 123 -> {1, 2, 3}. Resulting Stream is valid until the next call
+// to Map.
+func (m *intToDigitsMapper) Map(srcPtr, destPtr interface{}) bool {
+  x := *(srcPtr.(*int))
+  result := destPtr.(*Stream)
+  m.digits = m.digits[:0]
+  for x > 0 {
+    m.digits = append(m.digits, x % 10)
+    x /= 10
+  }
+  for i := 0; i < len(m.digits) - i - 1; i++ {
+    temp := m.digits[i]
+    m.digits[i] = m.digits[len(m.digits) - i - 1]
+    m.digits[len(m.digits) - i - 1] = temp
+  }
+  *result = NewStreamFromValues(m.digits)
+  return true
+}
+
+func (m *intToDigitsMapper) Fast() Mapper {
+  return m
+}
+
 var squareIntInt32 Mapper = NewMapper(
   func (srcPtr interface{}, destPtr interface{}) bool {
     p := srcPtr.(*int)
@@ -679,4 +746,3 @@ var int64Plus1 Mapper = NewMapper(
     *q = (*p) + 1
     return true
   })
-
