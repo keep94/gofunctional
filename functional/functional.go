@@ -191,7 +191,7 @@ func Slice(s Stream, start int, end int) Stream {
 // If x = (x1, x2, ...) and y = (y1, y2, ...) then
 // Concat(x, y) = (x1, x2, ..., y1, y2, ...)
 func Concat(s ...Stream) Stream {
-  return &concatStream{s, 0}
+  return Flatten(NewStreamFromValues(s))
 }
 
 // Join uses multiple Streams to form a new Stream of Tuples.
@@ -462,18 +462,6 @@ func (s *sliceStream) Next(ptr interface{}) bool {
     s.index++
   }
   return false
-}
-
-type concatStream struct {
-  streams []Stream
-  index int
-}
-
-func (s *concatStream) Next(ptr interface{}) bool {
-  for s.index < len(s.streams) && !s.streams[s.index].Next(ptr) {
-    s.index++
-  }
-  return s.index < len(s.streams)
 }
 
 type flattenStream struct {
