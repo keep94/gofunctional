@@ -203,28 +203,44 @@ func Join(s ...Stream) Stream {
   return &joinStream{s, false}
 }
 
-// Cycle emits the elements in the given slice over and over again.
-// Cycle([]int {3, 5}) = (3, 5, 3, 5, ...)
-// The Stream Cycle returns owns the passed in slice, so clients should not
-// later modify the slice passed to Cycle. If aSlice is a []T then Cycle
-// returns a Stream of T.
+// Cycle is deprecated. See CycleValues
 func Cycle(aSlice interface{}) Stream {
-  sliceValue := reflect.ValueOf(aSlice)
-  if sliceValue.Kind() != reflect.Slice {
-    panic("Slice argument expected")
-  }
-  return &cycleStream{sliceValue, sliceValue.Len(), 0}
+  return CycleValues(aSlice)
+}
+
+// CycleValues emits the elements in the given slice over and over again.
+// CycleValues([]int {3, 5}) = (3, 5, 3, 5, ...). If CycleValues is passed
+// an empty slice, then CycleValues returns an empty Stream.
+// The Stream CycleValues returns owns the passed in slice, so clients
+// should not later modify the slice passed to CycleValues. If aSlice is a
+// []T then CycleValues returns a Stream of T.
+func CycleValues(aSlice interface{}) Stream {
+  sliceValue := getSliceValueFromValue(aSlice)
+  return &cycleStream{sliceValue, assignFromValue, sliceValue.Len(), 0}
+}
+
+// CyclePtrs is like CycleValues except aSlice []*T slice, and CyclePtrs
+// returns a Stream of T. c is a Copier of T. If c is nil, regular assignment
+// is used.
+func CyclePtrs(aSlice interface{}, c Copier) Stream {
+  sliceValue := getSliceValueFromValue(aSlice)
+  return &cycleStream{sliceValue, toSliceValueCopy(c), sliceValue.Len(), 0}
 }
 
 // NewStreamFromValues convers a []T into a Stream of T. aSlice is a []T.
 // The returned Stream owns the passed in slice, so clients should not later
 // modify it.
 func NewStreamFromValues(aSlice interface{}) Stream {
-  sliceValue := reflect.ValueOf(aSlice)
-  if sliceValue.Kind() != reflect.Slice {
-    panic("Slice argument expected")
-  }
-  return &plainStream{sliceValue, sliceValue.Len(), 0}
+  sliceValue := getSliceValueFromValue(aSlice)
+  return &plainStream{sliceValue, assignFromValue, sliceValue.Len(), 0}
+}
+
+// NewStreamFromPtrs converts a []*T into a Stream of T. aSlice is a []*T.
+// The returned Stream owns the passed in slice, so clients should not later
+// modify it. c is a Copier of T. if c is nil, regular assignment is used.
+func NewStreamFromPtrs(aSlice interface{}, c Copier) Stream {
+  sliceValue := getSliceValueFromValue(aSlice)
+  return &plainStream{sliceValue, toSliceValueCopy(c), sliceValue.Len(), 0}
 }
 
 // Flatten converts a Stream of Stream of T into a Stream of T.
@@ -287,7 +303,7 @@ func PartitionPtrs(s Stream) Stream {
 // s must not be used directly once this function is called. k is the
 // key generating funtion which takes a *T pointer and returns the key.
 // ptr is a *T pointer providing storage for emitted values from s.
-// c is a Coper of T. If c is nil, it means use the assignment operator.
+// c is a Copier of T. If c is nil, it means use the assignment operator.
 func GroupBy(s Stream, k KeyFunc, ptr interface{}, c Copier) Stream {
   if c == nil {
     c = assignCopier
@@ -500,19 +516,23 @@ func (s *joinStream) Next(ptr interface{}) bool {
 
 type cycleStream struct {
   sliceValue reflect.Value
+  copyFunc func(src reflect.Value, dest interface{})
   length int
   index int
 }
 
 func (s *cycleStream) Next(ptr interface{}) bool {
-  value := s.sliceValue.Index(s.index % s.length)
-  reflect.Indirect(reflect.ValueOf(ptr)).Set(value)
-  s.index++
+  if s.length == 0 {
+    return false
+  }
+  s.copyFunc(s.sliceValue.Index(s.index), ptr)
+  s.index = (s.index + 1) % s.length
   return true
 }
 
 type plainStream struct {
   sliceValue reflect.Value
+  copyFunc func(src reflect.Value, dest interface{})
   length int
   index int
 }
@@ -521,8 +541,7 @@ func (s *plainStream) Next(ptr interface{}) bool {
   if s.index == s.length {
     return false
   }
-  value := s.sliceValue.Index(s.index)
-  reflect.Indirect(reflect.ValueOf(ptr)).Set(value)
+  s.copyFunc(s.sliceValue.Index(s.index), ptr)
   s.index++
   return true
 }
@@ -779,6 +798,14 @@ func getSliceValue(slicePtr interface{}) reflect.Value {
   return sliceValue
 }
 
+func getSliceValueFromValue(aSlice interface{}) reflect.Value {
+  sliceValue := reflect.ValueOf(aSlice)
+  if sliceValue.Kind() != reflect.Slice {
+    panic("Slice argument expected")
+  }
+  return sliceValue
+}
+
 func orList(f Filterer) []Filterer {
   ors, ok := f.(orFilterer)
   if ok {
@@ -876,9 +903,24 @@ func nextSlice(s Stream, sliceValue reflect.Value, toInterface func(reflect.Valu
 
 func assignCopier(src, dest interface{}) {
   srcP := reflect.ValueOf(src)
+  assignFromPtr(srcP, dest)
+}
+
+func assignFromValue(srcV reflect.Value, dest interface{}) {
   destP := reflect.ValueOf(dest)
-  if srcP.Kind() != reflect.Ptr || destP.Kind() != reflect.Ptr {
-    panic("src and dest must be pointer types.")
-  }
+  reflect.Indirect(destP).Set(srcV)
+}
+
+func assignFromPtr(srcP reflect.Value, dest interface{}) {
+  destP := reflect.ValueOf(dest)
   reflect.Indirect(destP).Set(reflect.Indirect(srcP))
+}
+
+func toSliceValueCopy(c Copier) func(src reflect.Value, dest interface{}) {
+  if c == nil {
+    return assignFromPtr
+  }
+  return func(src reflect.Value, dest interface{}) {
+    c(src.Interface(), dest)
+  }
 }

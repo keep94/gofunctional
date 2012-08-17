@@ -232,11 +232,51 @@ func TestJoin(t *testing.T) {
   }
 }
 
-func TestCycle(t *testing.T) {
+func TestCycleValues(t *testing.T) {
   var results[] int
-  AppendValues(Slice(Cycle([]int {3, 5}), 0, 4), &results)
+  AppendValues(Slice(CycleValues([]int {3, 5}), 0, 4), &results)
   if output := fmt.Sprintf("%v", results); output != "[3 5 3 5]"  {
     t.Errorf("Expected [3 5 3 5] got %v", output)
+  }
+}
+
+func TestCycleValuesWithEmptySlice(t *testing.T) {
+  s := CycleValues([]int {})
+  var x int
+  if s.Next(&x) {
+    t.Error("Expected empty Stream.")
+  }
+}
+
+func TestCyclePtrs(t *testing.T) {
+  var results[] int
+  AppendValues(Slice(CyclePtrs([]*int {ptrInt(3), ptrInt(5)}, nil), 0, 4), &results)
+  if output := fmt.Sprintf("%v", results); output != "[3 5 3 5]"  {
+    t.Errorf("Expected [3 5 3 5] got %v", output)
+  }
+}
+
+func TestCyclePtrsWithCopy(t *testing.T) {
+  var results[] int
+  AppendValues(Slice(CyclePtrs([]*int {ptrInt(3), ptrInt(5)}, copyInt), 0, 4), &results)
+  if output := fmt.Sprintf("%v", results); output != "[3 5 3 5]"  {
+    t.Errorf("Expected [3 5 3 5] got %v", output)
+  }
+}
+
+func TestNewStreamFromPtrs(t *testing.T) {
+  var results[] int
+  AppendValues(NewStreamFromPtrs([]*int {ptrInt(3), ptrInt(5)}, nil), &results)
+  if output := fmt.Sprintf("%v", results); output != "[3 5]"  {
+    t.Errorf("Expected [3 5] got %v", output)
+  }
+}
+
+func TestNewStreamFromPtrsWithCopy(t *testing.T) {
+  var results[] int
+  AppendValues(NewStreamFromPtrs([]*int {ptrInt(3), ptrInt(5)}, copyInt), &results)
+  if output := fmt.Sprintf("%v", results); output != "[3 5]"  {
+    t.Errorf("Expected [3 5] got %v", output)
   }
 }
 
@@ -678,6 +718,12 @@ func equal(x int) Filterer {
   
 func ptrInt(x int) *int {
   return &x
+}
+
+func copyInt(src, dest interface{}) {
+  p := src.(*int)
+  q := dest.(*int)
+  *q = *p
 }
 
 // getNthDigit returns the nth digit in the sequence:
