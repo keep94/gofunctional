@@ -210,9 +210,7 @@ func Cycle(aSlice interface{}) Stream {
 
 // CycleValues emits the elements in the given slice over and over again.
 // CycleValues([]int {3, 5}) = (3, 5, 3, 5, ...). If CycleValues is passed
-// an empty slice, then CycleValues returns an empty Stream.
-// The Stream CycleValues returns owns the passed in slice, so clients
-// should not later modify the slice passed to CycleValues. If aSlice is a
+// an empty slice, then CycleValues returns an empty Stream. If aSlice is a
 // []T then CycleValues returns a Stream of T.
 func CycleValues(aSlice interface{}) Stream {
   sliceValue := getSliceValueFromValue(aSlice)
@@ -228,16 +226,13 @@ func CyclePtrs(aSlice interface{}, c Copier) Stream {
 }
 
 // NewStreamFromValues convers a []T into a Stream of T. aSlice is a []T.
-// The returned Stream owns the passed in slice, so clients should not later
-// modify it.
 func NewStreamFromValues(aSlice interface{}) Stream {
   sliceValue := getSliceValueFromValue(aSlice)
   return &plainStream{sliceValue, assignFromValue, sliceValue.Len(), 0}
 }
 
 // NewStreamFromPtrs converts a []*T into a Stream of T. aSlice is a []*T.
-// The returned Stream owns the passed in slice, so clients should not later
-// modify it. c is a Copier of T. if c is nil, regular assignment is used.
+// c is a Copier of T. if c is nil, regular assignment is used.
 func NewStreamFromPtrs(aSlice interface{}, c Copier) Stream {
   sliceValue := getSliceValueFromValue(aSlice)
   return &plainStream{sliceValue, toSliceValueCopy(c), sliceValue.Len(), 0}
