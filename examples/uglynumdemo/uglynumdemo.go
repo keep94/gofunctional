@@ -14,7 +14,7 @@ import (
 func Ugly(primes []int) functional.Stream {
   q := odqueue.NewQueue()
   elements := make([]*odqueue.Element, len(primes))
-  current := q.Element
+  current := q.End()
   for i := range elements {
     elements[i] = current
   }

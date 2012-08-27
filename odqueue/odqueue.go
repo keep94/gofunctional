@@ -34,17 +34,23 @@ func (e *Element) IsEnd() bool {
 
 type Queue struct {
   // Element is the end of the queue.
-  *Element
+  e *Element
 }
 
 // Add stores x in the end element of this Queue and appends a new
 // end element.  Add returns its receiver for chaining.
 func (q *Queue) Add(x interface{}) *Queue {
-  q.Value = x
+  q.e.Value = x
   n := newElement()
-  q.next = n
-  q.Element = n
+  q.e.next = n
+  q.e = n
   return q
+}
+
+// End returns the end of this queue. Calling IsEnd on returned element
+// returns true.
+func (q *Queue) End() *Element {
+  return q.e
 }
 
 func newElement() *Element {

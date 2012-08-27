@@ -7,7 +7,7 @@ import (
 
 func TestQueue(t *testing.T) {
   q := NewQueue()
-  p1 := q.Element
+  p1 := q.End()
   p2 := p1
   q.Add(1).Add(2)
   if output := fmt.Sprintf("%v", toSlice(&p1)); output != "[1 2]" {
