@@ -306,6 +306,14 @@ func GroupBy(s Stream, k KeyFunc, ptr interface{}, c Copier) Stream {
   return groupByStream{&Group{s: s, ptr: ptr, k: k, c: c}}
 }
 
+// Deferred returns a Stream that emits the values from the Stream f returns.
+// f is not called until the first time Next is called on the returned stream.
+// In this way, the creation of a Stream can be deferred until the values
+// it emits are needed.
+func Deferred(f func() Stream) Stream {
+  return &deferredStream{f, nil}
+}
+
 // AppendValues evaluates s and appends each element in s to the slice that
 // slicePtr points to. s is a Stream of T; slicePtr is a *[]T
 func AppendValues(s Stream, slicePtr interface{}) {
@@ -652,6 +660,18 @@ func (g groupByStream) Next(ptr interface{}) bool {
   p := ptr.(**Group)
   *p = g.Group
   return true
+}
+
+type deferredStream struct {
+  f func() Stream
+  s Stream
+}
+
+func (d *deferredStream) Next(ptr interface{}) bool {
+  if d.s == nil {
+    d.s = d.f()
+  }
+  return d.s.Next(ptr)
 }
 
 type funcFilterer func(ptr interface{}) bool

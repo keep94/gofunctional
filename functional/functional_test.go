@@ -537,6 +537,15 @@ func TestFlattenWithEmptyStreams(t *testing.T) {
   }
 }
 
+func TestDeferred(t *testing.T) {
+  s := Deferred(func() Stream { return NewStreamFromValues([]int{2}) })
+  var results []int
+  AppendValues(s, &results)
+  if output := fmt.Sprintf("%v", results); output != "[2]" {
+    t.Errorf("Expected [2] got %v", output)
+  }
+}
+
 func TestAny(t *testing.T) {
   a := Any(equal(1), equal(2))
   b := Any()
