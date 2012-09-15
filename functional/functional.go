@@ -200,7 +200,7 @@ func Concat(s ...Stream) Stream {
 // The Stream Join returns quits emitting whenever one of the input Streams
 // runs out.
 func Join(s ...Stream) Stream {
-  return &joinStream{s, false}
+  return &joinStream{s}
 }
 
 // Cycle is deprecated. See CycleValues
@@ -246,13 +246,13 @@ func Flatten(s Stream) Stream {
 // TakeWhile returns a Stream that emits the values in s until f is false.
 // f is a Filterer of T; s is a Stream of T.
 func TakeWhile(f Filterer, s Stream) Stream {
-  return &takeStream{f, s, false}
+  return &takeStream{f, s}
 }
 
 // DropWhile returns a Stream that emits the values in s starting at the
 // first value where f is false. f is a Filterer of T; s is a Stream of T.
 func DropWhile(f Filterer, s Stream) Stream {
-  return &dropStream{f, s, false}
+  return &dropStream{f, s}
 }
 
 // ReadLines returns the lines of text in r separated by either "\n" or "\r\n"
@@ -470,16 +470,15 @@ func (s *sliceStream) Next(ptr interface{}) bool {
 type flattenStream struct {
   stream Stream
   current Stream
-  done bool
 }
 
 func (s *flattenStream) Next(ptr interface{}) bool {
-  if s.done {
+  if s.stream == nil {
     return false
   }
   for s.current == nil || !s.current.Next(ptr) {
     if !s.stream.Next(&s.current) {
-      s.done = true
+      s.stream = nil
       return false
     }
   }
@@ -488,17 +487,16 @@ func (s *flattenStream) Next(ptr interface{}) bool {
 
 type joinStream struct {
   streams []Stream
-  done bool
 }
 
 func (s *joinStream) Next(ptr interface{}) bool {
-  if s.done {
+  if s.streams == nil {
     return false
   }
   ptrs := ptr.(Tuple).Ptrs()
   for i := range s.streams {
     if !s.streams[i].Next(ptrs[i]) {
-      s.done = true
+      s.streams = nil
       return false
     }
   }
@@ -540,15 +538,14 @@ func (s *plainStream) Next(ptr interface{}) bool {
 type takeStream struct {
   filterer Filterer
   stream Stream
-  done bool
 }
 
 func (s *takeStream) Next(ptr interface{}) bool {
-  for !s.done && s.stream.Next(ptr) {
+  for s.stream != nil && s.stream.Next(ptr) {
     if s.filterer.Filter(ptr) {
       return true
     }
-    s.done = true
+    s.stream = nil
   }
   return false
 }
@@ -556,16 +553,15 @@ func (s *takeStream) Next(ptr interface{}) bool {
 type dropStream struct {
   filterer Filterer
   stream Stream
-  done bool
 }
 
 func (s *dropStream) Next(ptr interface{}) bool {
   for s.stream.Next(ptr) {
-    if s.done {
+    if s.filterer == nil {
       return true
     }
     if !s.filterer.Filter(ptr) {
-      s.done = true
+      s.filterer = nil
       return true
     }
   }
