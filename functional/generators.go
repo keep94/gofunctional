@@ -31,6 +31,12 @@ func NewGenerator(f func(e Emitter)) Generator {
   return g
 }
 
+// StreamToGenerator converts a Stream to a Generator. Closing the returned
+// Generator closes c.
+func StreamToGenerator(s Stream, c io.Closer) Generator {
+  return &simpleGenerator{s, c}
+}
+
 type regularGenerator struct {
   ptrCh chan interface{}
   doneCh chan bool
@@ -62,6 +68,11 @@ func (g *regularGenerator) cleanupIfDone() {
     g.ptrCh = nil
     g.doneCh = nil
   }
+}
+
+type simpleGenerator struct {
+  Stream
+  io.Closer
 }
 
 func genFuncWrapper(f func(e Emitter), g *regularGenerator) {

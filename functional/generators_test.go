@@ -6,7 +6,9 @@ import (
 )
 
 func TestNewInfiniteGenerator(t *testing.T) {
-  g := NewGenerator(
+
+  // fibonacci
+  fib := NewGenerator(
       func(e Emitter) {
         a := 0
         b := 1
@@ -17,13 +19,16 @@ func TestNewInfiniteGenerator(t *testing.T) {
         }
       })
   var results []int
-  AppendValues(Slice(g, 0, 7), &results)
+  first7Fibs := StreamToGenerator(Slice(fib, 0, 7), fib)
+  AppendValues(first7Fibs, &results)
   if output := fmt.Sprintf("%v", results); output != "[0 1 1 2 3 5 8]"  {
     t.Errorf("Expected [0 1 1 2 3 5 8] got %v", output)
   }
-  g.Close()
-  if g.Next(new(int)) {
-    t.Error("Next should return false after Close")
+  first7Fibs.Close()
+
+  // Closing first7Fibs should also close underlying fib generator
+  if fib.Next(new(int)) {
+    t.Error("fib generator should be closed")
   }
 }
 
@@ -32,12 +37,12 @@ func TestNewFiniteGenerator(t *testing.T) {
   g := NewGenerator(
       func(e Emitter) {
         values := []int{1, 2, 5}
-        for _, x := range values {
+        for i := range values {
           ptr := e.EmitPtr()
           if ptr == nil {
             break
           }
-          *ptr.(*int) = x
+          *ptr.(*int) = values[i]
         }
       })
   var results []int
