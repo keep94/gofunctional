@@ -336,6 +336,27 @@ func AppendPtrs(s Stream, slicePtr interface{}, c Creater) {
   }
 }
 
+// CopyValues copies emitted values from s to aValueSlice until either s
+// is exhausted or until it reaches the end of aValueSlice. CopyValues
+// returns the number of emitted values copied. If end of aValueSlice isn't
+// reached, caller must not assume anything about the contents of the rest of
+// the slice. s is a Stream of T; aValueSlice is a []T.
+func CopyValues(s Stream, aValueSlice interface{}) int {
+  sliceValue := getSliceValueFromValue(aValueSlice)
+  return copyToSlice(s, sliceValue, valueToInterface)
+}
+
+// CopyPtrs copies emitted values from s to aPtrSlice until either s
+// is exhausted or until it reaches the end of aPtrSlice. CopyPtrs
+// returns the number of emitted values copied. If end of aPtrSlice isn't
+// reached, caller must not assume anything about the contents of the rest of
+// the slice. s is a Stream of T; aPtrSlice is a []*T.
+// aPtrSlice must be pre-initialized with InitSlicePtrs.
+func CopyPtrs(s Stream, aPtrSlice interface{}) int {
+  sliceValue := getSliceValueFromValue(aPtrSlice)
+  return copyToSlice(s, sliceValue, ptrToInterface)
+}
+
 // InitSlicePtrs initializes the slice of type []*T that slicePtr points
 // to by having each element in the slice point to a new T.  c is a 
 // Creater of T. If c is nil, new(T) is used to create each T instance.
@@ -628,9 +649,7 @@ type partitionValuesStream struct {
 
 func (s partitionValuesStream) Next(slicePtr interface{}) bool {
   sliceValue := getSliceValue(slicePtr)
-  return nextSlice(s.Stream, sliceValue, func(v reflect.Value) interface{} {
-    return v.Addr().Interface()
-  })
+  return nextSlice(s.Stream, sliceValue, valueToInterface)
 }
 
 type partitionPtrsStream struct {
@@ -640,9 +659,7 @@ type partitionPtrsStream struct {
 func (s partitionPtrsStream) Next(slicePtr interface{}) bool {
   sliceValue := getSliceValue(slicePtr)
   assertPtrType(sliceValue.Type().Elem())
-  return nextSlice(s.Stream, sliceValue, func(v reflect.Value) interface{} {
-    return v.Interface()
-  })
+  return nextSlice(s.Stream, sliceValue, ptrToInterface)
 }
 
 type groupByStream struct {
@@ -885,19 +902,25 @@ func assertPtrType(t reflect.Type) {
 
 func nextSlice(s Stream, sliceValue reflect.Value, toInterface func(reflect.Value) interface{}) bool {
   length := sliceValue.Len()
+  numCopied := copyToSlice(s, sliceValue, toInterface)
+  if numCopied == 0 {
+    return false
+  }
+  if numCopied < length {
+    sliceValue.Set(sliceValue.Slice(0, numCopied))
+  }
+  return true
+}
+
+func copyToSlice(s Stream, sliceValue reflect.Value, toInterface func(reflect.Value) interface{}) int {
+  length := sliceValue.Len()
   var idx int
   for idx = 0; idx < length; idx++ {
     if !s.Next(toInterface(sliceValue.Index(idx))) {
       break
     }
   }
-  if idx == 0 {
-    return false
-  }
-  if idx < length {
-    sliceValue.Set(sliceValue.Slice(0, idx))
-  }
-  return true
+  return idx
 }
 
 func assignCopier(src, dest interface{}) {
@@ -922,4 +945,12 @@ func toSliceValueCopy(c Copier) func(src reflect.Value, dest interface{}) {
   return func(src reflect.Value, dest interface{}) {
     c(src.Interface(), dest)
   }
+}
+
+func valueToInterface(v reflect.Value) interface{} {
+  return v.Addr().Interface()
+}
+
+func ptrToInterface(v reflect.Value) interface{} {
+  return v.Interface()
 }

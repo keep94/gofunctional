@@ -424,6 +424,26 @@ func TestPartitionValuesEmpty(t *testing.T) {
   }
 }
 
+func TestCopyValuesTooMuch(t *testing.T) {
+  mySlice := make([]int, 3)
+  if numCopied := CopyValues(xrange(0, 4), mySlice); numCopied != 3 {
+    t.Error("Expected 3 values copied. Got %v", numCopied)
+  }
+  if output := fmt.Sprintf("%v", mySlice); output != "[0 1 2]" {
+    t.Errorf("Expected [0 1 2] but got %v", output)
+  }
+}
+
+func TestCopyValuesToLittle(t *testing.T) {
+  mySlice := make([]int, 3)
+  if numCopied := CopyValues(xrange(0, 2), mySlice); numCopied != 2 {
+    t.Error("Expected 2 values copied got %v.", numCopied)
+  }
+  if output := fmt.Sprintf("%v", mySlice[0:2]); output != "[0 1]" {
+    t.Errorf("Expected [0 1] but got %v", output)
+  }
+}
+
 func TestPartitionPtrs(t *testing.T) {
   expectedValues := [][]int {{0, 1, 2}, {3, 4, 5}, {6}}
   s := xrange(0, 7)
@@ -453,6 +473,34 @@ func TestPartitionPtrsEmpty(t *testing.T) {
   s = PartitionValues(s)
   if s.Next(&mySlice) {
     t.Error("Next should return false on an empty Stream.")
+  }
+}
+
+func TestCopyPtrsTooMuch(t *testing.T) {
+  mySlice := make([]*int, 3)
+  InitSlicePtrs(&mySlice, nil)
+  if numCopied := CopyPtrs(xrange(0, 4), mySlice); numCopied != 3 {
+    t.Error("Expected 3 ptrs copied. Got %v", numCopied)
+  }
+  expected := []int{0, 1, 2}
+  for i := range expected {
+    if expected[i] !=  *mySlice[i] {
+      t.Errorf("Expected %v but got %v", expected[i], *mySlice[i])
+    }
+  }
+}
+
+func TestCopyPtrsToLittle(t *testing.T) {
+  mySlice := make([]*int, 3)
+  InitSlicePtrs(&mySlice, nil)
+  if numCopied := CopyPtrs(xrange(0, 2), mySlice); numCopied != 2 {
+    t.Error("Expected 2 ptrs copied. Got %v", numCopied)
+  }
+  expected := []int{0, 1}
+  for i := range expected {
+    if expected[i] !=  *mySlice[i] {
+      t.Errorf("Expected %v but got %v", expected[i], *mySlice[i])
+    }
   }
 }
 
