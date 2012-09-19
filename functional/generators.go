@@ -44,7 +44,7 @@ type regularGenerator struct {
 
 func (g *regularGenerator) Next(ptr interface{}) bool {
   if g.ptrCh == nil {
-    return false;
+    return false
   }
   g.ptrCh <- ptr
   g.cleanupIfDone()
