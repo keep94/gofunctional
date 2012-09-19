@@ -238,6 +238,11 @@ func NewStreamFromPtrs(aSlice interface{}, c Copier) Stream {
   return &plainStream{sliceValue, toSliceValueCopy(c), sliceValue.Len(), 0}
 }
 
+// NilStream returns a stream that emits no values.
+func NilStream() Stream {
+  return kNilStream
+}
+
 // Flatten converts a Stream of Stream of T into a Stream of T.
 func Flatten(s Stream) Stream {
   return &flattenStream{stream: s}
@@ -687,6 +692,13 @@ func (d *deferredStream) Next(ptr interface{}) bool {
   return d.s.Next(ptr)
 }
 
+type nilStream struct {
+}
+
+func (s nilStream) Next(ptr interface{}) bool {
+  return false
+}
+
 type funcFilterer func(ptr interface{}) bool
 
 func (f funcFilterer) Filter(ptr interface{}) bool {
@@ -954,3 +966,5 @@ func valueToInterface(v reflect.Value) interface{} {
 func ptrToInterface(v reflect.Value) interface{} {
   return v.Interface()
 }
+
+var kNilStream Stream = nilStream{}

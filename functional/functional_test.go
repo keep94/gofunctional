@@ -280,6 +280,12 @@ func TestNewStreamFromPtrsWithCopy(t *testing.T) {
   }
 }
 
+func TestNilStream(t *testing.T) {
+  if NilStream().Next(new(int)) {
+    t.Error("Next on nil Stream should always return false.")
+  }
+}
+
 func TestDropWhileTakeWhile(t *testing.T) {
   var results[] int
   s := TakeWhile(lessThan(10), DropWhile(lessThan(7), Count()))
