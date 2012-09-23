@@ -57,6 +57,15 @@ func TestNoConsumers(t *testing.T) {
   }
 }
 
+func TestReadPastEnd(t *testing.T) {
+  s := Slice(Count(), 0, 5)
+  rc := &readPastEndConsumer{}
+  MultiConsume(s, new(int), nil, rc)
+  if !rc.completed {
+    t.Error("MultiConsume returned before child consumers completed.")
+  }
+}
+
 type filterConsumer struct {
   f Filterer
   results []int
@@ -64,6 +73,20 @@ type filterConsumer struct {
 
 func (fc *filterConsumer) Consume(s Stream) {
   AppendValues(Filter(fc.f, s), &fc.results)
+}
+
+type readPastEndConsumer struct {
+  completed bool
+}
+
+func (c *readPastEndConsumer) Consume(s Stream) {
+  var x int
+  for s.Next(&x) {
+  }
+  for i := 0; i < 10; i++ {
+    s.Next(&x)
+  }
+  c.completed = true
 }
 
 func newEvenNumberConsumer() *filterConsumer {

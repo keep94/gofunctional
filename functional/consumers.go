@@ -46,8 +46,13 @@ func MultiConsume(s Stream, ptr interface{}, copier Copier, consumers ...Consume
       }
     }
   }
-  for i := range streams {
-    streams[i].nextReturn(false)
+  for stillConsuming {
+    stillConsuming = false
+    for i := range streams {
+      if streams[i].nextReturn(false) {
+        stillConsuming = true
+      }
+    }
   }
 }
 
