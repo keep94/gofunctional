@@ -39,6 +39,7 @@ func TestNewInfiniteGenerator(t *testing.T) {
 }
 
 func TestNewFiniteGenerator(t *testing.T) {
+  var finished bool
   g := NewGenerator(
       func(e Emitter) {
         values := []int{1, 2, 5}
@@ -50,11 +51,15 @@ func TestNewFiniteGenerator(t *testing.T) {
           *ptr.(*int) = values[i]
           ptr = e.EmitPtr()
         }
+        finished = true
       })
   var results []int
   AppendValues(g, &results)
   if output := fmt.Sprintf("%v", results); output != "[1 2 5]" {
     t.Errorf("Expected [1 2 5] got %v", output)
+  }
+  if !finished {
+    t.Error("Generating function should have completed.")
   }
   if g.Next(new(int)) {
     t.Error("Next on generator should repeatedly return false after all value have been emitted. Got true")
@@ -63,7 +68,11 @@ func TestNewFiniteGenerator(t *testing.T) {
 }
 
 func TestEmptyGenerator(t *testing.T) {
-  g := NewGenerator(func (e Emitter) {})
+  var finished bool
+  g := NewGenerator(func (e Emitter) { finished = true })
+  if !finished {
+    t.Error("Generating function should have completed.")
+  }
   if g.Next(new(int)) {
     t.Error("Next should return false on empty generator, got true")
   }
