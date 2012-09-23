@@ -20,14 +20,12 @@ func TestNormal(t *testing.T) {
 
 func TestConsumersEndEarly(t *testing.T) {
   s := Count()
-  nc := ModifyConsumerStream(newEvenNumberConsumer(), func(s Stream) Stream {
-    return NilStream()
-  })
   first5 := func(s Stream) Stream {
     return Slice(s, 0, 5)
   }
   ec := newEvenNumberConsumer()
   oc := newOddNumberConsumer()
+  nc := &noNextConsumer{}
   MultiConsume(
       s,
       new(int),
@@ -40,6 +38,9 @@ func TestConsumersEndEarly(t *testing.T) {
   }
   if output := fmt.Sprintf("%v", oc.results); output != "[1 3]" {
     t.Errorf("Expected [1 3] got %v", output)
+  }
+  if !nc.completed {
+    t.Error("MultiConsume returned before child consumers completed.")
   }
   var result int
   s.Next(&result)
@@ -57,12 +58,28 @@ func TestNoConsumers(t *testing.T) {
   }
 }
 
-func TestReadPastEnd(t *testing.T) {
+func TestNoNextConsumer(t *testing.T) {
+  s := CountFrom(7, 1)
+  nc := &noNextConsumer{}
+  MultiConsume(s, new(int), nil, nc)
+  var result int
+  if !s.Next(&result) || result != 7 {
+    t.Errorf("Expected 7 got %v", result)
+  }
+  if !nc.completed {
+    t.Error("MultiConsume returned before child consumers completed.")
+  }
+} 
+
+func TestReadPastEndConsumer(t *testing.T) {
   s := Slice(Count(), 0, 5)
   rc := &readPastEndConsumer{}
   MultiConsume(s, new(int), nil, rc)
   if !rc.completed {
     t.Error("MultiConsume returned before child consumers completed.")
+  }
+  if s.Next(new(int)) {
+    t.Error("Expected underlying stream to be consumed but it was not.")
   }
 }
 
@@ -87,6 +104,14 @@ func (c *readPastEndConsumer) Consume(s Stream) {
     s.Next(&x)
   }
   c.completed = true
+}
+
+type noNextConsumer struct {
+  completed bool
+}
+
+func (nc *noNextConsumer) Consume(s Stream) {
+  nc.completed = true
 }
 
 func newEvenNumberConsumer() *filterConsumer {
