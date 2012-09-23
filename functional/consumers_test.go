@@ -73,9 +73,10 @@ func TestNoNextConsumer(t *testing.T) {
 
 func TestReadPastEndConsumer(t *testing.T) {
   s := Slice(Count(), 0, 5)
-  rc := &readPastEndConsumer{}
-  MultiConsume(s, new(int), nil, rc)
-  if !rc.completed {
+  rc1 := &readPastEndConsumer{}
+  rc2 := &readPastEndConsumer{}
+  MultiConsume(s, new(int), nil, rc1, rc2)
+  if !rc1.completed || !rc2.completed {
     t.Error("MultiConsume returned before child consumers completed.")
   }
   if s.Next(new(int)) {
