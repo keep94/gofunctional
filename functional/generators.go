@@ -15,8 +15,12 @@ type Emitter interface {
 
   // To emit a value, a function calls EmitPtr, converts the returned value
   // to the appropriate pointer type, and writes the value to emit there.
-  // If the client has closed the associated Generator, EmitPtr will return
-  // nil. When that happens, the function should simply return.
+  // The the final call to EmitPtr does not emit a value giving the function
+  // opportunity to cancel emitting after calling EmitPtr. Calling
+  // EmitPtr again causes the value stored at the previous result of EmitPtr
+  // to be emitted. If the client has closed the associated Generator,
+  // EmitPtr will return nil. When that happens, the function should simply
+  // return.
   EmitPtr() interface{}
 }
 
@@ -47,8 +51,7 @@ func (g *regularGenerator) Next(ptr interface{}) bool {
     return false
   }
   g.ptrCh <- ptr
-  g.cleanupIfDone()
-  return true
+  return g.cleanupIfDone()
 }
 
 func (g *regularGenerator) Close() error {
@@ -61,13 +64,15 @@ func (g *regularGenerator) EmitPtr() interface{} {
   return <-g.ptrCh
 }
 
-func (g *regularGenerator) cleanupIfDone() {
+func (g *regularGenerator) cleanupIfDone() bool {
   if <-g.doneCh {
     close(g.ptrCh)
     close(g.doneCh)
     g.ptrCh = nil
     g.doneCh = nil
+    return false
   }
+  return true
 }
 
 type simpleGenerator struct {
