@@ -78,6 +78,36 @@ func ChkbkEntries(conn *sqlite.Conn, acctId int) (functional.Generator, error) {
   }), nil
 }
 
+type Printer struct {
+}
+
+func (p Printer) Consume(s functional.Stream) {
+  var entry Entry
+  for s.Next(&entry) {
+    fmt.Println(&entry)
+  }
+}
+
+type Totaler struct {
+  Total int64
+  Income bool
+}
+
+func (t *Totaler) Consume(s functional.Stream) {
+  var entry Entry
+  for s.Next(&entry) {
+    if t.Income {
+      if entry.Amount < 0 {
+        t.Total -= entry.Amount
+      }
+    } else {
+      if entry.Amount > 0 {
+        t.Total += entry.Amount
+      }
+    }
+  }
+}
+
 func main() {
   conn, err := sqlite.Open("chkbook.db")
   if err != nil {
@@ -88,11 +118,10 @@ func main() {
   if err != nil {
     fmt.Printf("Error reading ledger %v", err)
   }
-  var entry Entry
-  for g.Next(&entry) {
-    fmt.Println(&entry)
-  }
-  // Since we exhaust g we don't need to close explicitly, but it is good
-  // practice to always close a Generator
+  expenseTotaler := &Totaler{}
+  incomeTotaler := &Totaler{Income: true}
+  functional.MultiConsume(g, new(Entry), nil, Printer{}, expenseTotaler, incomeTotaler)
   g.Close()
+  fmt.Printf("Total income: %d\n", incomeTotaler.Total)
+  fmt.Printf("Total expenses: %d\n", expenseTotaler.Total)
 }
