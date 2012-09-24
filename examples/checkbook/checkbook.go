@@ -78,6 +78,7 @@ func ChkbkEntries(conn *sqlite.Conn, acctId int) (functional.Generator, error) {
   }), nil
 }
 
+// Printer prints entries to stdout
 type Printer struct {
 }
 
@@ -88,8 +89,11 @@ func (p Printer) Consume(s functional.Stream) {
   }
 }
 
+// Totaler totals expenses or incomes
 type Totaler struct {
+  // The total
   Total int64
+  // True if totaling incomes; false if totaling expenses
   Income bool
 }
 
