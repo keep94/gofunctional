@@ -222,6 +222,7 @@ func CycleValues(aSlice interface{}) Stream {
 // is used.
 func CyclePtrs(aSlice interface{}, c Copier) Stream {
   sliceValue := getSliceValueFromValue(aSlice)
+  assertPtrType(sliceValue.Type().Elem())
   return &cycleStream{sliceValue, toSliceValueCopy(c), sliceValue.Len(), 0}
 }
 
@@ -235,6 +236,7 @@ func NewStreamFromValues(aSlice interface{}) Stream {
 // c is a Copier of T. if c is nil, regular assignment is used.
 func NewStreamFromPtrs(aSlice interface{}, c Copier) Stream {
   sliceValue := getSliceValueFromValue(aSlice)
+  assertPtrType(sliceValue.Type().Elem())
   return &plainStream{sliceValue, toSliceValueCopy(c), sliceValue.Len(), 0}
 }
 
@@ -359,6 +361,7 @@ func CopyValues(s Stream, aSlice interface{}) int {
 // aSlice must be pre-initialized with InitPtrs.
 func CopyPtrs(s Stream, aSlice interface{}) int {
   sliceValue := getSliceValueFromValue(aSlice)
+  assertPtrType(sliceValue.Type().Elem())
   return copyToSlice(s, sliceValue, ptrToInterface)
 }
 
