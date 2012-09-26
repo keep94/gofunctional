@@ -11,7 +11,7 @@ import (
   "github.com/keep94/gofunctional/functional"
 )
 
-var kEmptySetOnly [](*[]int) = [](*[]int){&[]int{}}
+var kEmptySetOnly []*[]int = []*[]int{{}}
 
 // Power returns the power set of items as a Stream of []int. Returned
 // Stream expects to emit to a slice with capacity equal to len(items)
