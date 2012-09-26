@@ -322,7 +322,7 @@ func Deferred(f func() Stream) Stream {
 // AppendValues evaluates s and appends each element in s to the slice that
 // slicePtr points to. s is a Stream of T; slicePtr is a *[]T
 func AppendValues(s Stream, slicePtr interface{}) {
-  sliceValue := getSliceValue(slicePtr)
+  sliceValue := getSliceValueFromPtr(slicePtr)
   sliceElementType := sliceValue.Type().Elem()
   sliceValue.Set(appendValues(s, sliceElementType, sliceValue))
 }
@@ -331,7 +331,7 @@ func AppendValues(s Stream, slicePtr interface{}) {
 // slicePtr points to. s is a Stream of T; slicePtr is a *[]*T.
 // c is a Creater of T. If c is nil, it means use the new built-in function.
 func AppendPtrs(s Stream, slicePtr interface{}, c Creater) {
-  sliceValue := getSliceValue(slicePtr)
+  sliceValue := getSliceValueFromPtr(slicePtr)
   sliceElementType := sliceValue.Type().Elem()
   assertPtrType(sliceElementType)
   if c == nil {
@@ -653,7 +653,7 @@ type partitionValuesStream struct {
 }
 
 func (s partitionValuesStream) Next(slicePtr interface{}) bool {
-  sliceValue := getSliceValue(slicePtr)
+  sliceValue := getSliceValueFromPtr(slicePtr)
   return nextSlice(s.Stream, sliceValue, valueToInterface)
 }
 
@@ -662,7 +662,7 @@ type partitionPtrsStream struct {
 }
 
 func (s partitionPtrsStream) Next(slicePtr interface{}) bool {
-  sliceValue := getSliceValue(slicePtr)
+  sliceValue := getSliceValueFromPtr(slicePtr)
   assertPtrType(sliceValue.Type().Elem())
   return nextSlice(s.Stream, sliceValue, ptrToInterface)
 }
@@ -818,7 +818,7 @@ func appendValues(
   return sliceValue
 }
 
-func getSliceValue(slicePtr interface{}) reflect.Value {
+func getSliceValueFromPtr(slicePtr interface{}) reflect.Value {
   sliceValue := reflect.Indirect(reflect.ValueOf(slicePtr))
   if !sliceValue.CanSet() || sliceValue.Kind() != reflect.Slice {
     panic("slicePtr must be a pointer to a slice.")
