@@ -286,7 +286,7 @@ func PartitionValues(s Stream) Stream {
 // PartitionPtrs converts a Stream of T to a Stream of []*T where each
 // emitted value has same length. When calling Next on returned Stream,
 // pass a pointer pointing to a slice of type []*T initialized with make
-// and InitSlicePtrs. The returned Stream fills this slice with values with
+// and InitPtrs. The returned Stream fills this slice with values with
 // each call to Next. If s runs out before returned Stream can completely
 // fill the slice, it emits a smaller slice with just the remaining values
 // to the pointer passed to Next.
@@ -341,33 +341,33 @@ func AppendPtrs(s Stream, slicePtr interface{}, c Creater) {
   }
 }
 
-// CopyValues copies emitted values from s to aValueSlice until either s
-// is exhausted or until it reaches the end of aValueSlice. CopyValues
-// returns the number of emitted values copied. If end of aValueSlice isn't
+// CopyValues copies emitted values from s to aSlice until either s
+// is exhausted or until it reaches the end of aSlice. CopyValues
+// returns the number of emitted values copied. If end of aSlice isn't
 // reached, caller must not assume anything about the contents of the rest of
-// the slice. s is a Stream of T; aValueSlice is a []T.
-func CopyValues(s Stream, aValueSlice interface{}) int {
-  sliceValue := getSliceValueFromValue(aValueSlice)
+// the slice. s is a Stream of T; aSlice is a []T.
+func CopyValues(s Stream, aSlice interface{}) int {
+  sliceValue := getSliceValueFromValue(aSlice)
   return copyToSlice(s, sliceValue, valueToInterface)
 }
 
-// CopyPtrs copies emitted values from s to aPtrSlice until either s
-// is exhausted or until it reaches the end of aPtrSlice. CopyPtrs
-// returns the number of emitted values copied. If end of aPtrSlice isn't
+// CopyPtrs copies emitted values from s to aSlice until either s
+// is exhausted or until it reaches the end of aSlice. CopyPtrs
+// returns the number of emitted values copied. If end of aSlice isn't
 // reached, caller must not assume anything about the contents of the rest of
-// the slice. s is a Stream of T; aPtrSlice is a []*T.
-// aPtrSlice must be pre-initialized with InitSlicePtrs.
-func CopyPtrs(s Stream, aPtrSlice interface{}) int {
-  sliceValue := getSliceValueFromValue(aPtrSlice)
+// the slice. s is a Stream of T; aSlice is a []*T.
+// aSlice must be pre-initialized with InitPtrs.
+func CopyPtrs(s Stream, aSlice interface{}) int {
+  sliceValue := getSliceValueFromValue(aSlice)
   return copyToSlice(s, sliceValue, ptrToInterface)
 }
 
-// InitSlicePtrs initializes the slice of type []*T that slicePtr points
-// to by having each element in the slice point to a new T.  c is a 
+// InitPtrs initializes aSlice of type []*T
+// by having each element point to a new T.  c is a 
 // Creater of T. If c is nil, new(T) is used to create each T instance.
-// InitSlicePtrs returns the same slicePtr passed to it.
-func InitSlicePtrs(slicePtr interface{}, c Creater) interface{} {
-  sliceValue := getSliceValue(slicePtr)
+// InitPtrs returns the same slice passed to it.
+func InitPtrs(aSlice interface{}, c Creater) interface{} {
+  sliceValue := getSliceValueFromValue(aSlice)
   sliceElementType := sliceValue.Type().Elem()
   assertPtrType(sliceElementType)
   length := sliceValue.Len()
@@ -381,7 +381,7 @@ func InitSlicePtrs(slicePtr interface{}, c Creater) interface{} {
   for i := 0; i < length; i++ {
     sliceValue.Index(i).Set(creater())
   }
-  return slicePtr
+  return aSlice
 }
 
 // Any returns a Filterer that returns true if any of the

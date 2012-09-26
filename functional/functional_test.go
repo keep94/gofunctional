@@ -453,8 +453,7 @@ func TestCopyValuesToLittle(t *testing.T) {
 func TestPartitionPtrs(t *testing.T) {
   expectedValues := [][]int {{0, 1, 2}, {3, 4, 5}, {6}}
   s := xrange(0, 7)
-  mySlice := make([]*int, 3)
-  InitSlicePtrs(&mySlice, nil)
+  mySlice := InitPtrs(make([]*int, 3), nil).([]*int)
   s = PartitionPtrs(s)
   var i int
   for i = 0; s.Next(&mySlice); i++ {
@@ -475,7 +474,7 @@ func TestPartitionPtrs(t *testing.T) {
 func TestPartitionPtrsEmpty(t *testing.T) {
   s := xrange(0, 0)
   mySlice := make([]*int, 3)
-  InitSlicePtrs(&mySlice, nil)
+  InitPtrs(mySlice, nil)
   s = PartitionValues(s)
   if s.Next(&mySlice) {
     t.Error("Next should return false on an empty Stream.")
@@ -484,7 +483,7 @@ func TestPartitionPtrsEmpty(t *testing.T) {
 
 func TestCopyPtrsTooMuch(t *testing.T) {
   mySlice := make([]*int, 3)
-  InitSlicePtrs(&mySlice, nil)
+  InitPtrs(mySlice, nil)
   if numCopied := CopyPtrs(xrange(0, 4), mySlice); numCopied != 3 {
     t.Error("Expected 3 ptrs copied. Got %v", numCopied)
   }
@@ -498,7 +497,7 @@ func TestCopyPtrsTooMuch(t *testing.T) {
 
 func TestCopyPtrsToLittle(t *testing.T) {
   mySlice := make([]*int, 3)
-  InitSlicePtrs(&mySlice, nil)
+  InitPtrs(mySlice, nil)
   if numCopied := CopyPtrs(xrange(0, 2), mySlice); numCopied != 2 {
     t.Error("Expected 2 ptrs copied. Got %v", numCopied)
   }
@@ -510,11 +509,10 @@ func TestCopyPtrsToLittle(t *testing.T) {
   }
 }
 
-func TestInitSlicePtrs(t *testing.T) {
-  mySlice := make([]*int, 3)
-  InitSlicePtrs(&mySlice, func() interface{} { return new(int) })
+func TestInitPtrs(t *testing.T) {
+  mySlice := InitPtrs(make([]*int, 3), func() interface{} { return new(int) }).([]*int)
   if *mySlice[0] != 0 || *mySlice[1] != 0 || *mySlice[2] != 0 {
-    t.Error("InitSlicePtrs failed")
+    t.Error("InitPtrs failed")
   }
 }
   
